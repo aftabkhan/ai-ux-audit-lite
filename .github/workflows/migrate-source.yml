@@ -1,0 +1,63 @@
+name: Complete source migration
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/migrate-source.yml"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out clean public repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download complete sanitized source snapshot
+        run: |
+          git clone --depth 1 --branch sprint-14-product-experience \
+            https://github.com/aftabkhan/ai-ux-audit-lite-archive.git /tmp/source
+
+      - name: Replace repository contents
+        run: |
+          rsync -a --delete \
+            --exclude='.git/' \
+            /tmp/source/ ./
+
+          rm -f .github/workflows/migrate-source.yml
+
+      - name: Verify restricted references are absent
+        run: |
+          if grep -Rni --exclude-dir=.git 'pixtack' .; then
+            echo "Restricted reference detected. Migration stopped."
+            exit 1
+          fi
+
+      - name: Verify complete file inventory
+        run: |
+          diff -u \
+            <(cd /tmp/source && find . -path './.git' -prune -o -type f -print | sort) \
+            <(find . -path './.git' -prune -o -type f -print | sort)
+
+      - name: Create migration branch and pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B complete-source-migration
+          git add -A
+          git commit -m "chore: restore complete sanitized source snapshot"
+          git push --force-with-lease origin complete-source-migration
+          gh pr create \
+            --base main \
+            --head complete-source-migration \
+            --title "Restore complete sanitized source snapshot" \
+            --body "Copies the complete Sprint 14 source snapshot from the temporary archive without importing its Git history. The workflow verifies exact file inventory and blocks restricted references before creating this PR."
