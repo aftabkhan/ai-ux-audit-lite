@@ -12,6 +12,7 @@ interface AuditResultsProps {
 
 type SeverityFilter = "all" | FindingSeverity;
 type CategoryFilter = "all" | AuditCategory;
+
 const severityOrder: FindingSeverity[] = ["high", "medium", "low"];
 
 export function AuditResults({ result, onReset }: AuditResultsProps) {
@@ -39,6 +40,7 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
 
   const scorecard = useMemo(() => createAuditScorecard(result.findings), [result.findings]);
   const normalizedQuery = query.trim().toLowerCase();
+
   const filteredFindings = useMemo(
     () =>
       result.findings.filter((finding) => {
@@ -54,6 +56,7 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
         ]
           .join(" ")
           .toLowerCase();
+
         return matchesFilters && (!normalizedQuery || searchableText.includes(normalizedQuery));
       }),
     [category, normalizedQuery, result.findings, severity],
@@ -82,7 +85,9 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
           <h2 id="audit-results-heading" tabIndex={-1}>UX review results</h2>
           <p>{result.summary.overview}</p>
         </div>
-        <button className="secondary-button" type="button" onClick={onReset}>Start a new review</button>
+        <button className="secondary-button" type="button" onClick={onReset}>
+          Start a new review
+        </button>
       </div>
 
       <section className="audit-scorecard" aria-labelledby="scorecard-heading">
@@ -94,8 +99,13 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
         <div className="category-score-list" aria-label="Category score overview">
           {scorecard.byCategory.slice(0, 6).map((item) => (
             <div className="category-score" key={item.category}>
-              <div><span>{formatLabel(item.category)}</span><strong>{item.score}</strong></div>
-              <div className="score-track" aria-hidden="true"><span style={{ width: `${item.score}%` }} /></div>
+              <div>
+                <span>{formatLabel(item.category)}</span>
+                <strong>{item.score}</strong>
+              </div>
+              <div className="score-track" aria-hidden="true">
+                <span style={{ width: `${item.score}%` }} />
+              </div>
             </div>
           ))}
         </div>
@@ -108,32 +118,93 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
       <dl className="severity-summary" aria-label="Findings by severity">
         {severityOrder.map((item) => (
           <div key={item} className={`severity-summary-card severity-${item}`}>
-            <dt>{item}</dt><dd>{counts[item]}</dd>
+            <dt>{item}</dt>
+            <dd>{counts[item]}</dd>
           </div>
         ))}
-        <div className="severity-summary-card"><dt>Total</dt><dd>{result.findings.length}</dd></div>
+        <div className="severity-summary-card">
+          <dt>Total</dt>
+          <dd>{result.findings.length}</dd>
+        </div>
       </dl>
 
       <div className="summary-grid">
-        <section aria-labelledby="strengths-heading"><h3 id="strengths-heading">Strengths</h3><ul>{result.summary.strengths.map((item) => <li key={item}>{item}</li>)}</ul></section>
-        <section aria-labelledby="priorities-heading"><h3 id="priorities-heading">Priority actions</h3><ol>{result.summary.priorityActions.map((item) => <li key={item}>{item}</li>)}</ol></section>
+        <section aria-labelledby="strengths-heading">
+          <h3 id="strengths-heading">Strengths</h3>
+          <ul>
+            {result.summary.strengths.map((strength) => (
+              <li key={strength}>{strength}</li>
+            ))}
+          </ul>
+        </section>
+        <section aria-labelledby="priorities-heading">
+          <h3 id="priorities-heading">Priority actions</h3>
+          <ol>
+            {result.summary.priorityActions.map((action) => (
+              <li key={action}>{action}</li>
+            ))}
+          </ol>
+        </section>
       </div>
 
       <div className="results-toolbar" aria-label="Search, filter, and export results">
         <div className="filter-group">
-          <label className="finding-search"><span>Search findings</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search observation or recommendation" /></label>
-          <label><span>Severity</span><select value={severity} onChange={(event) => setSeverity(event.target.value as SeverityFilter)}><option value="all">All severities</option>{severityOrder.map((item) => <option key={item} value={item}>{formatLabel(item)} ({counts[item]})</option>)}</select></label>
-          <label><span>Category</span><select value={category} onChange={(event) => setCategory(event.target.value as CategoryFilter)}><option value="all">All categories</option>{categories.map((item) => <option key={item} value={item}>{formatLabel(item)}</option>)}</select></label>
+          <label className="finding-search">
+            <span>Search findings</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search observation or recommendation"
+            />
+          </label>
+
+          <label>
+            <span>Severity</span>
+            <select value={severity} onChange={(event) => setSeverity(event.target.value as SeverityFilter)}>
+              <option value="all">All severities</option>
+              {severityOrder.map((item) => (
+                <option key={item} value={item}>
+                  {item[0].toUpperCase() + item.slice(1)} ({counts[item]})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>Category</span>
+            <select value={category} onChange={(event) => setCategory(event.target.value as CategoryFilter)}>
+              <option value="all">All categories</option>
+              {categories.map((item) => (
+                <option key={item} value={item}>
+                  {formatLabel(item)}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
+
         <div className="export-actions">
-          <button className="secondary-button" type="button" onClick={copyMarkdown}>Copy Markdown</button>
-          <button className="secondary-button" type="button" onClick={() => downloadAuditMarkdown(result)}>Download Markdown</button>
-          <button className="secondary-button" type="button" onClick={() => downloadAuditJson(result)}>Download JSON</button>
+          <button className="secondary-button" type="button" onClick={copyMarkdown}>
+            Copy Markdown
+          </button>
+          <button className="secondary-button" type="button" onClick={() => downloadAuditMarkdown(result)}>
+            Download Markdown
+          </button>
+          <button className="secondary-button" type="button" onClick={() => downloadAuditJson(result)}>
+            Download JSON
+          </button>
         </div>
       </div>
 
-      <p className="status-message results-status" role="status" aria-live="polite">{copyStatus}</p>
-      <div className="findings-heading"><h3>Detailed findings</h3><p>{filteredFindings.length} shown</p></div>
+      <p className="status-message results-status" role="status" aria-live="polite">
+        {copyStatus}
+      </p>
+
+      <div className="findings-heading">
+        <h3>Detailed findings</h3>
+        <p>{filteredFindings.length} shown</p>
+      </div>
 
       {filteredFindings.length ? (
         <ol className="findings-list">
@@ -142,22 +213,41 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
               <details open={index === 0}>
                 <summary>
                   <span className="finding-summary-copy">
-                    <span className="finding-card-header"><span><span className={`severity-badge severity-${finding.severity}`}>{finding.severity}</span><span className="category-badge">{formatLabel(finding.category)}</span></span><span className="confidence-label">{finding.confidence} confidence</span></span>
+                    <span className="finding-card-header">
+                      <span>
+                        <span className={`severity-badge severity-${finding.severity}`}>{finding.severity}</span>
+                        <span className="category-badge">{formatLabel(finding.category)}</span>
+                      </span>
+                      <span className="confidence-label">{finding.confidence} confidence</span>
+                    </span>
                     <strong>{finding.title}</strong>
                   </span>
                   <span className="finding-toggle" aria-hidden="true">+</span>
                 </summary>
                 <dl className="finding-details">
-                  <div><dt>Observation</dt><dd>{finding.observation}</dd></div>
-                  <div><dt>Impact</dt><dd>{finding.impact}</dd></div>
-                  <div><dt>Recommendation</dt><dd>{finding.recommendation}</dd></div>
+                  <div>
+                    <dt>Observation</dt>
+                    <dd>{finding.observation}</dd>
+                  </div>
+                  <div>
+                    <dt>Impact</dt>
+                    <dd>{finding.impact}</dd>
+                  </div>
+                  <div>
+                    <dt>Recommendation</dt>
+                    <dd>{finding.recommendation}</dd>
+                  </div>
                 </dl>
               </details>
             </li>
           ))}
         </ol>
       ) : (
-        <div className="empty-results" role="status"><h4>No findings match your search</h4><p>Change the search or filters to view more findings.</p><button className="secondary-button" type="button" onClick={clearFilters}>Clear search and filters</button></div>
+        <div className="empty-results" role="status">
+          <h4>No findings match your search</h4>
+          <p>Change the search or filters to view more findings.</p>
+          <button className="secondary-button" type="button" onClick={clearFilters}>Clear search and filters</button>
+        </div>
       )}
 
       <p className="results-disclaimer">{result.disclaimer}</p>
@@ -166,5 +256,8 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
 }
 
 function formatLabel(value: string): string {
-  return value.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+  return value
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
