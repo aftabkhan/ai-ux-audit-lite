@@ -2,7 +2,7 @@
 
 A focused public portfolio project demonstrating AI-assisted UX analysis, accessible frontend engineering, and structured product thinking.
 
-> Status: Sprint 14 implementation is complete. Automated quality checks run on every pull request; final live deployment and manual release evidence are tracked separately.
+> Status: Sprint 14 implementation is complete. Sprint 15 production launch preparation is in progress.
 
 ## Overview
 
@@ -35,6 +35,7 @@ The application includes:
 - Reset and new-review flow
 - Lightweight request rate limiting
 - Vitest tests and GitHub Actions quality workflow
+- Production metadata, robots, sitemap, and baseline security headers
 
 Fixture mode returns schema-valid sample findings without inspecting screenshot pixels. OpenAI mode submits the screenshot and user context from the server route and validates the structured response before rendering it.
 
@@ -145,6 +146,7 @@ npm run build
 - [Product experience](docs/PRODUCT-EXPERIENCE.md)
 - [Quality review](docs/QA-REVIEW.md)
 - [Release validation](docs/RELEASE-VALIDATION.md)
+- [Production deployment](docs/DEPLOYMENT.md)
 - [Release checklist](RELEASE-CHECKLIST.md)
 - [Roadmap](ROADMAP.md)
 - [Security and privacy](SECURITY.md)
