@@ -17,9 +17,35 @@ const playfair = Playfair_Display({
   display: "swap",
 });
 
+const siteUrl = new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000");
+
 export const metadata: Metadata = {
-  title: "AI UX Audit Lite",
-  description: "A lightweight AI-assisted UX review tool for interface screenshots.",
+  metadataBase: siteUrl,
+  title: {
+    default: "AI UX Audit Lite",
+    template: "%s | AI UX Audit Lite",
+  },
+  description: "Upload an interface screenshot and receive a structured AI-assisted UX review.",
+  applicationName: "AI UX Audit Lite",
+  authors: [{ name: "Aftab Khan" }],
+  creator: "Aftab Khan",
+  keywords: ["UX audit", "AI UX review", "accessibility", "frontend engineering", "product design"],
+  openGraph: {
+    type: "website",
+    url: siteUrl,
+    title: "AI UX Audit Lite",
+    description: "A focused AI-assisted UX review tool for interface screenshots.",
+    siteName: "AI UX Audit Lite",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AI UX Audit Lite",
+    description: "A focused AI-assisted UX review tool for interface screenshots.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
