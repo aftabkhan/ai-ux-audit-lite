@@ -2,7 +2,7 @@
 
 A focused public portfolio project demonstrating AI-assisted UX analysis, accessible frontend engineering, and structured product thinking.
 
-> Status: MVP implementation complete. Automated quality checks are passing on `main`; manual browser and release verification remain tracked in the release checklist.
+> Status: Sprint 14 implementation is complete. Automated quality checks run on every pull request; final live deployment and manual release evidence are tracked separately.
 
 ## Overview
 
@@ -21,18 +21,22 @@ The application includes:
 - Server-side `/api/audit` route
 - Provider-independent audit interface
 - Deterministic fixture provider for safe local development
+- Screenshot-aware OpenAI provider behind the same server-side interface
 - Zod validation for context and provider responses
 - Stable public error mapping and no-store responses
-- Accessible loading, success, and recovery messaging
+- Accessible staged progress and recovery messaging
+- Transparent directional UX score and category overview
 - Audit summary with strengths and priority actions
 - Severity counts and structured findings
-- Severity and category filters
+- Search, severity filters, and category filters
+- Expandable detailed findings
 - Markdown copy and download
 - JSON download
 - Reset and new-review flow
+- Lightweight request rate limiting
 - Vitest tests and GitHub Actions quality workflow
 
-The default fixture provider returns schema-valid sample findings but does not inspect screenshot pixels. A real multimodal provider can be added behind the same internal interface without changing UI components.
+Fixture mode returns schema-valid sample findings without inspecting screenshot pixels. OpenAI mode submits the screenshot and user context from the server route and validates the structured response before rendering it.
 
 ## What It Demonstrates
 
@@ -56,12 +60,13 @@ The first release supports:
 - Eight limited UX review categories
 - Summary and findings grouped by severity
 - Actionable recommendations
-- Severity and category filtering
+- Transparent directional scoring
+- Search and report filtering
 - Markdown copy and download
 - JSON download
 - Clear AI-assisted review limitations
 
-The MVP does not include crawling, accounts, saved history, benchmarking, continuous monitoring, formal accessibility certification, or proprietary scoring.
+The MVP does not include crawling, accounts, saved history, benchmarking, continuous monitoring, formal accessibility certification, or commercial scoring.
 
 ## Review Categories
 
@@ -88,19 +93,20 @@ The MVP does not include crawling, accounts, saved history, benchmarking, contin
 
 ## Quality Status
 
-The latest `main` workflow passes:
+The `Quality / verify` workflow runs:
 
+- Reproducible dependency installation with `npm ci`
 - Typecheck
 - Lint
 - Unit tests
 - Production build
 
-Historical failed workflow runs remain visible because GitHub preserves past CI results. The current branch state is represented by the latest successful run.
+Historical failed workflow runs remain visible because GitHub preserves past CI results. The latest protected-branch result represents the current code state.
 
 ## Run Locally
 
 ```bash
-npm install
+npm ci
 cp .env.example .env.local
 npm run dev
 ```
@@ -135,7 +141,10 @@ npm run build
 - [UX flow](docs/UX-FLOW.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Audit schema](docs/AUDIT-SCHEMA.md)
+- [Intelligent audit engine](docs/INTELLIGENT-AUDIT-ENGINE.md)
+- [Product experience](docs/PRODUCT-EXPERIENCE.md)
 - [Quality review](docs/QA-REVIEW.md)
+- [Release validation](docs/RELEASE-VALIDATION.md)
 - [Release checklist](RELEASE-CHECKLIST.md)
 - [Roadmap](ROADMAP.md)
 - [Security and privacy](SECURITY.md)
@@ -147,7 +156,7 @@ The canonical TypeScript contract is available in [`src/types/audit.ts`](src/typ
 
 Do not upload or commit confidential, personal, client-owned, employer-owned, regulated, or NDA-protected interface screenshots.
 
-The MVP does not store screenshots or audit history. Raw images and user context must not be written to logs. Provider-side data handling must be documented before a real provider is enabled.
+The application does not persist screenshots or audit history. Raw images and user context must not be written to logs. Provider-side handling must be reviewed against the deployment configuration before public release.
 
 ## Disclaimer
 
