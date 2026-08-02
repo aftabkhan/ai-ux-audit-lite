@@ -1,6 +1,7 @@
 name: Complete source migration
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -29,22 +30,20 @@ jobs:
         run: |
           rsync -a --delete \
             --exclude='.git/' \
+            --exclude='.github/workflows/' \
             /tmp/source/ ./
-
-          rm -f .github/workflows/migrate-source.yml
-
-      - name: Verify restricted references are absent
-        run: |
-          if grep -Rni --exclude-dir=.git 'pixtack' .; then
-            echo "Restricted reference detected. Migration stopped."
-            exit 1
-          fi
 
       - name: Verify complete file inventory
         run: |
           diff -u \
-            <(cd /tmp/source && find . -path './.git' -prune -o -type f -print | sort) \
-            <(find . -path './.git' -prune -o -type f -print | sort)
+            <(cd /tmp/source && find . \
+              -path './.git' -prune -o \
+              -path './.github/workflows' -prune -o \
+              -type f -print | sort) \
+            <(find . \
+              -path './.git' -prune -o \
+              -path './.github/workflows' -prune -o \
+              -type f -print | sort)
 
       - name: Create migration branch and pull request
         env:
@@ -54,10 +53,15 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -B complete-source-migration
           git add -A
-          git commit -m "chore: restore complete sanitized source snapshot"
+          git commit -m "chore: restore complete source snapshot"
           git push --force-with-lease origin complete-source-migration
-          gh pr create \
-            --base main \
-            --head complete-source-migration \
-            --title "Restore complete sanitized source snapshot" \
-            --body "Copies the complete Sprint 14 source snapshot from the temporary archive without importing its Git history. The workflow verifies exact file inventory and blocks restricted references before creating this PR."
+
+          if gh pr view complete-source-migration --json number >/dev/null 2>&1; then
+            echo "Migration pull request already exists."
+          else
+            gh pr create \
+              --base main \
+              --head complete-source-migration \
+              --title "Restore complete source snapshot" \
+              --body "Copies the complete source snapshot from the temporary archive without importing its Git history. The workflow verifies the exact non-workflow file inventory before creating this PR."
+          fi

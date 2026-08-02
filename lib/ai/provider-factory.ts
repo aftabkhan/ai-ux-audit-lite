@@ -6,8 +6,13 @@ import { AuditServiceError } from "@/lib/audit/errors";
 export function getAuditProvider(): AuditProvider {
   const provider = process.env.AUDIT_PROVIDER ?? "fixture";
 
-  if (provider === "fixture") return new FixtureAuditProvider();
-  if (provider === "openai") return new OpenAIAuditProvider();
+  if (provider === "fixture") {
+    return new FixtureAuditProvider();
+  }
+
+  if (provider === "openai") {
+    return new OpenAIAuditProvider();
+  }
 
   throw new AuditServiceError(
     "PROVIDER_ERROR",

@@ -32,7 +32,7 @@ export function AuditForm() {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState<string>("");
   const [progressIndex, setProgressIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<AuditResult | null>(null);
@@ -44,13 +44,11 @@ export function AuditForm() {
     };
   }, [previewUrl]);
 
-  function updateField(field: keyof FormState, value: string) {
-    setForm((current) => ({ ...current, [field]: value }));
-  }
-
   function clearPreview() {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(null);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -61,6 +59,7 @@ export function AuditForm() {
 
     if (!selectedFile) {
       setFile(null);
+      setFileError(null);
       return;
     }
 
@@ -68,12 +67,17 @@ export function AuditForm() {
     if (!validation.valid) {
       setFile(null);
       setFileError(validation.message);
+      event.target.value = "";
       return;
     }
 
     setFile(selectedFile);
-    setFileError(null);
     setPreviewUrl(URL.createObjectURL(selectedFile));
+    setFileError(null);
+  }
+
+  function updateField(field: keyof FormState, value: string) {
+    setForm((current) => ({ ...current, [field]: value }));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -106,7 +110,7 @@ export function AuditForm() {
 
       if (!response.ok) {
         const error = payload as AuditError;
-        setStatus([error.message, error.recovery].filter(Boolean).join(" "));
+        setStatus(error.recovery ? `${error.message} ${error.recovery}` : error.message);
         return;
       }
 
@@ -127,23 +131,26 @@ export function AuditForm() {
 
   function resetAudit() {
     clearPreview();
-    setFile(null);
     setForm(initialFormState);
+    setFile(null);
     setFileError(null);
     setStatus("");
     setResult(null);
     setProgressIndex(0);
     setInputKey((current) => current + 1);
-    requestAnimationFrame(() => document.getElementById(fileInputId)?.focus());
+    requestAnimationFrame(() => {
+      document.getElementById(fileInputId)?.focus();
+      document.getElementById("screenshot-heading")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   return (
     <>
-      <form className="audit-form" onSubmit={handleSubmit} noValidate>
-        <section className="form-section" aria-labelledby="upload-heading">
+      <form className="audit-form" onSubmit={handleSubmit} noValidate aria-busy={isSubmitting}>
+        <section className="form-section" aria-labelledby="screenshot-heading">
           <div className="section-heading">
-            <p className="step-label">Step 1</p>
-            <h2 id="upload-heading">Upload an interface screenshot</h2>
+            <span className="step-label">Step 1</span>
+            <h2 id="screenshot-heading">Upload an interface screenshot</h2>
             <p>Use a PNG, JPEG, or WebP image up to 5 MB. Avoid confidential or personal information.</p>
           </div>
 
@@ -151,7 +158,17 @@ export function AuditForm() {
             <span className="upload-title">{file ? "Replace screenshot" : "Choose screenshot"}</span>
             <span className="upload-help">PNG, JPEG, or WebP · Maximum 5 MB</span>
           </label>
-          <input key={inputKey} className="visually-hidden" id={fileInputId} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleFileChange} aria-describedby={fileError ? `${fileInputId}-error` : undefined} disabled={isSubmitting} />
+          <input
+            key={inputKey}
+            className="visually-hidden"
+            id={fileInputId}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={handleFileChange}
+            aria-describedby={fileError ? `${fileInputId}-error` : undefined}
+            aria-invalid={Boolean(fileError)}
+            disabled={isSubmitting}
+          />
 
           {fileError ? <p className="field-error" id={`${fileInputId}-error`} role="alert">{fileError}</p> : null}
 
@@ -159,22 +176,35 @@ export function AuditForm() {
             <figure className="preview-card">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={previewUrl} alt={`Preview of ${file.name}`} />
-              <figcaption><strong>{file.name}</strong><span>{Math.ceil(file.size / 1024)} KB · Ready to review</span></figcaption>
+              <figcaption>
+                <strong>{file.name}</strong>
+                <span>{Math.ceil(file.size / 1024)} KB · Ready to review</span>
+              </figcaption>
             </figure>
           ) : null}
         </section>
 
         <section className="form-section" aria-labelledby="context-heading">
           <div className="section-heading">
-            <p className="step-label">Step 2</p>
+            <span className="step-label">Step 2</span>
             <h2 id="context-heading">Add context</h2>
             <p>Context helps the review stay relevant to the screen, product, and intended audience.</p>
           </div>
 
           <div className="field-grid">
-            <label><span>Screen title</span><input type="text" value={form.screenTitle} onChange={(event) => updateField("screenTitle", event.target.value)} maxLength={100} placeholder="Example: Checkout payment step" disabled={isSubmitting} /></label>
-            <label><span>Target user</span><input type="text" value={form.targetUser} onChange={(event) => updateField("targetUser", event.target.value)} maxLength={120} placeholder="Example: First-time mobile customer" disabled={isSubmitting} /></label>
-            <label className="full-width"><span>Product context</span><textarea value={form.productContext} onChange={(event) => updateField("productContext", event.target.value)} maxLength={600} rows={5} placeholder="Describe the user goal, business context, or known constraints." disabled={isSubmitting} /><small>{form.productContext.length}/600 characters</small></label>
+            <label>
+              <span>Screen title</span>
+              <input type="text" value={form.screenTitle} onChange={(event) => updateField("screenTitle", event.target.value)} maxLength={100} placeholder="Example: Checkout payment step" disabled={isSubmitting} />
+            </label>
+            <label>
+              <span>Target user</span>
+              <input type="text" value={form.targetUser} onChange={(event) => updateField("targetUser", event.target.value)} maxLength={120} placeholder="Example: First-time mobile customer" disabled={isSubmitting} />
+            </label>
+            <label className="full-width">
+              <span>Product context</span>
+              <textarea value={form.productContext} onChange={(event) => updateField("productContext", event.target.value)} maxLength={600} rows={5} placeholder="Describe the user goal, business context, or known constraints." disabled={isSubmitting} />
+              <small>{form.productContext.length}/600 characters</small>
+            </label>
           </div>
         </section>
 
@@ -185,7 +215,13 @@ export function AuditForm() {
 
         <div className="status-message" role="status" aria-live="polite" aria-atomic="true">
           {isSubmitting ? (
-            <div className="audit-progress"><span className="audit-progress-spinner" aria-hidden="true" /><div><strong>{progressMessages[progressIndex]}</strong><span>AI is preparing a screenshot-specific first-pass review.</span></div></div>
+            <div className="audit-progress">
+              <span className="audit-progress-spinner" aria-hidden="true" />
+              <div>
+                <strong>{progressMessages[progressIndex]}</strong>
+                <span>AI is preparing a screenshot-specific first-pass review.</span>
+              </div>
+            </div>
           ) : status ? <p>{status}</p> : null}
         </div>
       </form>

@@ -5,68 +5,46 @@ export class FixtureAuditProvider implements AuditProvider {
   readonly name = "fixture";
 
   async review(input: AuditProviderInput): Promise<AuditResult> {
-    const screenName = input.context.screenTitle || input.image.fileName;
+    const screen = input.context.screenTitle || "the submitted interface";
 
     return {
       version: "1.0",
       generatedAt: new Date().toISOString(),
       context: input.context,
       summary: {
-        overview: `This sample report demonstrates the result structure for ${screenName}. Fixture mode is deterministic and does not inspect screenshot pixels.`,
+        overview: `This development fixture demonstrates the structured result expected for ${screen}. It does not inspect image pixels and must not be represented as a real AI review.`,
         strengths: [
-          "The screen can be evaluated through a clear hierarchy of findings.",
-          "Recommendations are separated from observations and likely impact.",
+          "The interface provides a visible primary task area.",
+          "The review context can be supplied without requiring an account.",
         ],
         priorityActions: [
-          "Confirm one visually dominant primary action.",
-          "Review content grouping and scanability.",
-          "Validate keyboard, focus, and contrast behaviour manually.",
+          "Confirm that the primary action remains visually dominant.",
+          "Review text contrast, labels, and keyboard focus before release.",
         ],
       },
       findings: [
         {
-          id: "primary-action-emphasis",
-          title: "Primary action may need stronger emphasis",
-          severity: "high",
+          id: "fixture-visual-hierarchy",
+          title: "Validate primary-action prominence",
+          severity: "medium",
           category: "visual-hierarchy",
-          observation: "Fixture mode provides a representative hierarchy finding rather than analysing the submitted pixels.",
-          impact: "Users may hesitate when multiple actions appear equally important.",
-          recommendation: "Use position, contrast, label clarity, and surrounding space to establish one primary action.",
+          observation: "The fixture cannot inspect the screenshot, so primary-action prominence remains unverified.",
+          impact: "Users may hesitate if several actions appear equally important.",
+          recommendation: "Use size, position, contrast, and spacing to establish one clear next action.",
           confidence: "low",
         },
         {
-          id: "content-scanability",
-          title: "Supporting content should remain easy to scan",
-          severity: "medium",
-          category: "readability",
-          observation: "Dense or weakly grouped content commonly increases review effort.",
-          impact: "Important information can be missed during quick task completion.",
-          recommendation: "Use concise headings, shorter text blocks, and consistent spacing between related groups.",
-          confidence: "low",
-        },
-        {
-          id: "visible-system-status",
-          title: "System status should be explicit",
-          severity: "medium",
-          category: "feedback-system-status",
-          observation: "Loading, success, and failure states should remain visible near the action that triggered them.",
-          impact: "Unclear feedback can lead to repeated actions or uncertainty.",
-          recommendation: "Provide accessible progress, success, and recovery messages with clear next steps.",
-          confidence: "low",
-        },
-        {
-          id: "accessibility-verification",
-          title: "Accessibility requires manual verification",
-          severity: "low",
+          id: "fixture-accessibility",
+          title: "Complete an accessibility review",
+          severity: "high",
           category: "accessibility-basics",
-          observation: "A screenshot cannot confirm keyboard order, semantic structure, announcements, or exact contrast values.",
-          impact: "Visual review alone can miss barriers affecting keyboard and assistive-technology users.",
-          recommendation: "Validate focus order, accessible names, semantics, zoom behaviour, and contrast with appropriate tools.",
+          observation: "Automated fixture mode cannot validate contrast, focus order, semantics, or assistive-technology behavior.",
+          impact: "Accessibility barriers may prevent people from understanding or completing the task.",
+          recommendation: "Run keyboard, screen-reader, zoom, and contrast checks with the implemented interface.",
           confidence: "high",
         },
       ],
-      disclaimer:
-        "Fixture mode returns deterministic sample content and does not inspect screenshot pixels. Use a configured multimodal provider for screenshot-specific feedback.",
+      disclaimer: "Development fixture only. This response is not generated from screenshot analysis and is not a formal UX or accessibility audit.",
     };
   }
 }

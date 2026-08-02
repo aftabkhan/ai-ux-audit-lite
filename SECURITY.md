@@ -1,17 +1,40 @@
 # Security and Privacy
 
-## Reporting a vulnerability
+## Public Demo Warning
 
-Please report security concerns privately to the repository owner. Do not include sensitive screenshots, access tokens, API keys, or personal data in public issues.
+Do not upload confidential, personal, regulated, client-owned, employer-owned, or NDA-protected interface screenshots.
 
-## Data handling
+## MVP Data Policy
 
-- Screenshots are accepted only as PNG, JPEG, or WebP files up to 5 MB.
-- The application does not write screenshots or audit history to application storage.
-- Provider credentials are server-side environment variables and must never use a `NEXT_PUBLIC_` prefix.
-- Responses use `Cache-Control: no-store`.
-- AI output is advisory and must not be treated as accessibility, security, legal, or compliance certification.
+The intended MVP:
 
-## Safe use
+- Processes one screenshot per request
+- Does not create user accounts
+- Does not store audit history
+- Does not add a screenshot database
+- Does not log raw screenshots
+- Does not expose AI-provider credentials to the browser
 
-Never upload confidential, employer-owned, client-owned, regulated, personal, or NDA-protected interface screenshots.
+Actual provider-side retention and processing terms must be reviewed and documented before public deployment.
+
+## Implementation Requirements
+
+- Keep API keys on the server.
+- Validate file size and MIME type on the server.
+- Do not trust browser-provided file metadata alone.
+- Do not render model-generated HTML.
+- Exclude uploaded content from application logs.
+- Return safe user-facing errors rather than raw provider errors.
+- Apply reasonable request limits before public deployment.
+
+## Supported Files
+
+The MVP should accept only PNG, JPEG, and WebP images within the documented size limit.
+
+## Reporting a Vulnerability
+
+Do not open a public issue containing sensitive details. Contact the repository owner privately through the email listed on the GitHub profile.
+
+## Disclaimer
+
+This project provides an AI-assisted first-pass UX review. It does not provide a security audit, legal opinion, accessibility certification, or formal compliance assessment.

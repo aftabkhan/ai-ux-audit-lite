@@ -28,6 +28,7 @@ const findings: AuditFinding[] = [
 describe("createAuditScorecard", () => {
   it("applies documented severity penalties", () => {
     const scorecard = createAuditScorecard(findings);
+
     expect(scorecard.overall).toBe(82);
     expect(scorecard.byCategory).toEqual([
       { category: "visual-hierarchy", score: 88, findings: 1 },
@@ -36,7 +37,11 @@ describe("createAuditScorecard", () => {
   });
 
   it("clamps heavily penalized reports at zero", () => {
-    const repeated = Array.from({ length: 10 }, (_, index) => ({ ...findings[0], id: String(index) }));
+    const repeated = Array.from({ length: 10 }, (_, index) => ({
+      ...findings[0],
+      id: String(index),
+    }));
+
     expect(createAuditScorecard(repeated).overall).toBe(0);
   });
 });
