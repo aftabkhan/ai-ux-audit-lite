@@ -33,35 +33,70 @@ export async function POST(request: Request) {
     const screenshot = formData.get("screenshot");
 
     if (!(screenshot instanceof File)) {
-      throw new AuditServiceError("INVALID_FILE", "Add a screenshot before starting the audit.", 400);
+      throw new AuditServiceError(
+        "INVALID_REQUEST",
+        "A screenshot is required.",
+        400,
+        "Choose one PNG, JPEG, or WebP screenshot and submit the form again.",
+      );
     }
 
     if (!ACCEPTED_SCREENSHOT_TYPES.includes(screenshot.type as (typeof ACCEPTED_SCREENSHOT_TYPES)[number])) {
-      throw new AuditServiceError("INVALID_FILE", "Choose a PNG, JPEG, or WebP screenshot.", 400);
+      throw new AuditServiceError(
+        "INVALID_FILE",
+        "The screenshot format is not supported.",
+        415,
+        "Use a PNG, JPEG, or WebP image.",
+      );
     }
 
     if (screenshot.size > MAX_SCREENSHOT_BYTES) {
-      throw new AuditServiceError("FILE_TOO_LARGE", "The screenshot must be 5 MB or smaller.", 413);
+      throw new AuditServiceError(
+        "FILE_TOO_LARGE",
+        "The screenshot is larger than 5 MB.",
+        413,
+        "Compress the image or choose a smaller screenshot.",
+      );
     }
 
-    const context = auditContextSchema.parse({
+    const parsedContext = auditContextSchema.safeParse({
       screenTitle: optionalText(formData.get("screenTitle")),
       productContext: optionalText(formData.get("productContext")),
       targetUser: optionalText(formData.get("targetUser")),
     });
 
+    if (!parsedContext.success) {
+      throw new AuditServiceError(
+        "INVALID_REQUEST",
+        "The supplied screen context is invalid.",
+        400,
+        "Shorten the context fields and submit the audit again.",
+      );
+    }
+
     const provider = getAuditProvider();
-    const result = await provider.review({
+    const bytes = new Uint8Array(await screenshot.arrayBuffer());
+    const rawResult = await provider.review({
       image: {
-        bytes: new Uint8Array(await screenshot.arrayBuffer()),
+        bytes,
         mimeType: screenshot.type as "image/png" | "image/jpeg" | "image/webp",
         fileName: screenshot.name,
       },
-      context,
+      context: parsedContext.data,
     });
 
-    const validated = auditResultSchema.parse(result);
-    return NextResponse.json(validated, {
+    const result = auditResultSchema.safeParse(rawResult);
+    if (!result.success) {
+      throw new AuditServiceError(
+        "INVALID_RESPONSE",
+        "The audit provider returned an invalid response.",
+        502,
+        "Retry the audit. If the problem continues, review the provider configuration.",
+      );
+    }
+
+    return NextResponse.json(result.data, {
+      status: 200,
       headers: {
         "Cache-Control": "no-store",
         "X-Audit-Provider": provider.name,

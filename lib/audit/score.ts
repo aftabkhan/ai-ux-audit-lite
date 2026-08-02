@@ -15,6 +15,11 @@ export interface AuditScorecard {
   }>;
 }
 
+/**
+ * Creates a simple directional score for the public portfolio experience.
+ * It is intentionally transparent and is not a benchmark, certification,
+ * or commercially validated scoring method.
+ */
 export function createAuditScorecard(findings: AuditFinding[]): AuditScorecard {
   const overallPenalty = findings.reduce(
     (total, finding) => total + severityPenalty[finding.severity],

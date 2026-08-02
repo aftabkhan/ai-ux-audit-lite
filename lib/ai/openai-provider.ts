@@ -6,7 +6,9 @@ import type { AuditResult } from "@/src/types/audit";
 
 interface OpenAIResponse {
   output_text?: string;
-  output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+  output?: Array<{
+    content?: Array<{ type?: string; text?: string }>;
+  }>;
 }
 
 interface ModelAuditPayload {
@@ -67,7 +69,9 @@ export class OpenAIAuditProvider implements AuditProvider {
     }
 
     const raw = (await response.json()) as OpenAIResponse;
-    const parsed = parseModelPayload(extractOutputText(raw));
+    const text = extractOutputText(raw);
+    const parsed = parseModelPayload(text);
+
     const result: AuditResult = {
       version: "1.0",
       generatedAt: new Date().toISOString(),
@@ -79,16 +83,17 @@ export class OpenAIAuditProvider implements AuditProvider {
       },
       findings: parsed.findings,
       disclaimer:
-        "AI-generated first-pass UX review based on one screenshot and the context provided. Validate findings through research, accessibility testing, analytics, and expert review before making product decisions.",
+        "AI-generated first-pass UX review based on one screenshot and the context provided. Validate findings through user research, accessibility testing, analytics, and expert review before making product decisions.",
     };
 
     const validated = auditResultSchema.safeParse(result);
     if (!validated.success) {
+      console.error("OpenAI audit response failed validation", validated.error.flatten());
       throw new AuditServiceError(
         "INVALID_RESPONSE",
         "The AI provider returned an incomplete audit report.",
         502,
-        "Retry the audit. If the problem continues, review the model configuration.",
+        "Retry the audit. If the problem continues, review the model and prompt configuration.",
       );
     }
 
@@ -98,6 +103,7 @@ export class OpenAIAuditProvider implements AuditProvider {
 
 function extractOutputText(response: OpenAIResponse): string {
   if (response.output_text?.trim()) return response.output_text.trim();
+
   const text = response.output
     ?.flatMap((item) => item.content ?? [])
     .filter((content) => content.type === "output_text" && content.text)
@@ -106,16 +112,28 @@ function extractOutputText(response: OpenAIResponse): string {
     .trim();
 
   if (!text) {
-    throw new AuditServiceError("INVALID_RESPONSE", "The AI provider returned no audit content.", 502, "Retry the audit.");
+    throw new AuditServiceError(
+      "INVALID_RESPONSE",
+      "The AI provider returned no audit content.",
+      502,
+      "Retry the audit.",
+    );
   }
+
   return text;
 }
 
 function parseModelPayload(text: string): ModelAuditPayload {
   const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+
   try {
     return JSON.parse(cleaned) as ModelAuditPayload;
   } catch {
-    throw new AuditServiceError("INVALID_RESPONSE", "The AI provider returned an unreadable audit report.", 502, "Retry the audit.");
+    throw new AuditServiceError(
+      "INVALID_RESPONSE",
+      "The AI provider returned an unreadable audit report.",
+      502,
+      "Retry the audit.",
+    );
   }
 }

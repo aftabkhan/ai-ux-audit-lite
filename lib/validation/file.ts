@@ -7,11 +7,17 @@ export type ScreenshotValidationResult =
 
 export function validateScreenshot(file: File): ScreenshotValidationResult {
   if (!ACCEPTED_SCREENSHOT_TYPES.includes(file.type as (typeof ACCEPTED_SCREENSHOT_TYPES)[number])) {
-    return { valid: false, message: "Choose a PNG, JPEG, or WebP screenshot." };
+    return {
+      valid: false,
+      message: "Choose a PNG, JPEG, or WebP screenshot.",
+    };
   }
 
   if (file.size > MAX_SCREENSHOT_BYTES) {
-    return { valid: false, message: "The screenshot must be 5 MB or smaller." };
+    return {
+      valid: false,
+      message: "The screenshot must be 5 MB or smaller.",
+    };
   }
 
   return { valid: true };
