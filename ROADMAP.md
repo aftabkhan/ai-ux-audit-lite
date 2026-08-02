@@ -34,14 +34,19 @@ Status: Complete
 - Add safe error handling
 - Add deterministic fixture for local development
 - Connect the form to the server route
+- Add screenshot-aware multimodal provider support
+- Add rate limiting and no-store responses
 
 ## v0.4 — Results Experience
 
 Status: Complete
 
 - Render summary and severity counts
+- Add transparent directional score and category scorecard
 - Add accessible findings list
+- Add search across finding content
 - Add filtering by severity and category
+- Add expandable detailed findings
 - Add Markdown copy and download
 - Add JSON download
 - Add reset and new-review flow
@@ -49,34 +54,32 @@ Status: Complete
 
 ## v0.5 — Quality Tooling
 
-Status: Implemented, verification pending
+Status: Complete
 
 - Add Vitest and Testing Library configuration
 - Add tests for screenshot validation
 - Add tests for audit response schemas
 - Add tests for Markdown export
+- Add tests for prompt constraints and score calculation
 - Add combined `npm run verify` quality gate
 - Add GitHub Actions workflow for typecheck, lint, tests, and build
 - Document accessibility, responsive, security, and privacy review
 - Add evidence-based release checklist
 
-The release checklist remains open until commands and manual browser checks have been run successfully.
+## v0.6 — Portfolio Release
 
-## v1.0 — Portfolio Release
+Status: In progress
 
-Status: Planned
-
-- Complete CI and local verification
-- Complete keyboard, screen-reader, responsive, and automated accessibility checks
-- Decide whether fixture-only deployment is sufficient for the portfolio
-- Connect and document a real multimodal provider only after privacy and cost controls are approved
-- Add rate limiting before unrestricted public use
+- Complete manual browser validation
+- Complete keyboard and 200% zoom validation
+- Complete automated accessibility validation
+- Configure the selected production provider and cost controls
 - Deploy the application
-- Add screenshots and demo media
-- Add final architecture diagram
-- Publish known limitations
+- Add repository screenshots and demo media
+- Add live URL to the repository profile
+- Publish final known limitations
 - Write portfolio case-study summary
 
 ## Non-Goals
 
-The roadmap does not include proprietary scoring, continuous monitoring, website crawling, benchmarking, or private commercial capabilities.
+The roadmap does not include website crawling, saved accounts, continuous monitoring, benchmarking, formal accessibility certification, or undisclosed commercial functionality.
