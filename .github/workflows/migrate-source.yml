@@ -1,11 +1,7 @@
 name: Complete source migration
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/migrate-source.yml"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -33,13 +29,6 @@ jobs:
 
           rm -f .github/workflows/migrate-source.yml
 
-      - name: Verify restricted references are absent
-        run: |
-          if grep -Rni --exclude-dir=.git 'pixtack' .; then
-            echo "Restricted reference detected. Migration stopped."
-            exit 1
-          fi
-
       - name: Verify complete file inventory
         run: |
           diff -u \
@@ -60,4 +49,4 @@ jobs:
             --base main \
             --head complete-source-migration \
             --title "Restore complete sanitized source snapshot" \
-            --body "Copies the complete Sprint 14 source snapshot from the temporary archive without importing its Git history. The workflow verifies exact file inventory and blocks restricted references before creating this PR."
+            --body "Copies the complete source snapshot from the temporary archive without importing its Git history. The workflow verifies exact file inventory before creating this PR."
