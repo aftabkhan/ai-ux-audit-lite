@@ -79,10 +79,10 @@ test("fixture audit completes, focuses results, filters findings, and resets", a
   await page.getByLabel("Screen title").fill("Checkout");
   await page.getByRole("button", { name: "Run UX audit" }).click();
 
-  const resultsHeading = page.getByRole("heading", { name: /audit results/i });
+  const resultsHeading = page.getByRole("heading", { name: "UX review results" });
   await expect(resultsHeading).toBeVisible({ timeout: 30_000 });
   await expect(resultsHeading).toBeFocused();
-  await expect(page.getByRole("status")).toContainText("Audit complete");
+  await expect(page.getByRole("status").first()).toContainText("Audit complete");
 
   const search = page.getByRole("searchbox");
   if (await search.count()) {
