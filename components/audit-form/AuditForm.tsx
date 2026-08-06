@@ -51,6 +51,18 @@ export function AuditForm() {
     }
   }
 
+  function removeScreenshot() {
+    clearPreview();
+    setFile(null);
+    setFileError(null);
+    setStatus("Screenshot removed. Choose another screenshot when you are ready.");
+    setResult(null);
+    setInputKey((current) => current + 1);
+    requestAnimationFrame(() => {
+      document.getElementById(fileInputId)?.focus();
+    });
+  }
+
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const selectedFile = event.target.files?.[0] ?? null;
     setStatus("");
@@ -177,8 +189,13 @@ export function AuditForm() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={previewUrl} alt={`Preview of ${file.name}`} />
               <figcaption>
-                <strong>{file.name}</strong>
-                <span>{Math.ceil(file.size / 1024)} KB · Ready to review</span>
+                <div>
+                  <strong>{file.name}</strong>
+                  <span>{Math.ceil(file.size / 1024)} KB · Ready to review</span>
+                </div>
+                <button className="secondary-button" type="button" onClick={removeScreenshot} disabled={isSubmitting}>
+                  Remove screenshot
+                </button>
               </figcaption>
             </figure>
           ) : null}
