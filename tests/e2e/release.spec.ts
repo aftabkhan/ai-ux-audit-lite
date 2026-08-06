@@ -54,23 +54,25 @@ test("screenshot can be previewed, removed, and selected again without losing co
 
 test("unsupported and oversized files provide recoverable validation", async ({ page }) => {
   await page.goto("/");
+  const fieldError = page.locator(".field-error");
 
   await page.getByLabel(/^Choose screenshot/).setInputFiles({
     name: "notes.txt",
     mimeType: "text/plain",
     buffer: Buffer.from("not an image"),
   });
-  await expect(page.getByRole("alert")).toContainText(/PNG|JPEG|WebP/i);
+  await expect(fieldError).toContainText(/PNG|JPEG|WebP/i);
 
   await page.getByLabel(/^Choose screenshot/).setInputFiles({
     name: "large.png",
     mimeType: "image/png",
     buffer: Buffer.alloc(5 * 1024 * 1024 + 1),
   });
-  await expect(page.getByRole("alert")).toContainText(/5 MB/i);
+  await expect(fieldError).toContainText(/5 MB/i);
 });
 
-test("fixture audit completes, focuses results, filters findings, and resets", async ({ page }) => {
+test("fixture audit completes, focuses results, filters findings, and resets", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-desktop", "Run the rate-limited fixture audit once; the remaining projects validate the client flow.");
   test.slow();
   await page.goto("/");
   await uploadScreenshot(page);
