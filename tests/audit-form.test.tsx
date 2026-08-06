@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuditForm } from "@/components/audit-form/AuditForm";
 
@@ -24,6 +24,7 @@ describe("AuditForm screenshot controls", () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.clearAllMocks();
     vi.unstubAllGlobals();
   });
@@ -31,7 +32,7 @@ describe("AuditForm screenshot controls", () => {
   it("shows a preview and lets the user remove a valid screenshot", () => {
     render(<AuditForm />);
 
-    const input = screen.getByLabelText("Choose screenshot") as HTMLInputElement;
+    const input = screen.getByLabelText(/^Choose screenshot/) as HTMLInputElement;
     const screenshot = new File(["image-data"], "checkout.png", { type: "image/png" });
 
     fireEvent.change(input, { target: { files: [screenshot] } });
@@ -63,7 +64,7 @@ describe("AuditForm screenshot controls", () => {
     });
 
     const screenshot = new File(["image-data"], "checkout.webp", { type: "image/webp" });
-    fireEvent.change(screen.getByLabelText("Choose screenshot"), {
+    fireEvent.change(screen.getByLabelText(/^Choose screenshot/), {
       target: { files: [screenshot] },
     });
     fireEvent.click(screen.getByRole("button", { name: "Remove screenshot" }));
@@ -80,6 +81,6 @@ describe("AuditForm screenshot controls", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Add a screenshot before starting the audit.",
     );
-    expect(screen.getByLabelText("Choose screenshot")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText(/^Choose screenshot/)).toHaveAttribute("aria-invalid", "true");
   });
 });
