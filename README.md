@@ -2,7 +2,7 @@
 
 A focused public portfolio project demonstrating AI-assisted UX analysis, accessible frontend engineering, and structured product thinking.
 
-> Status: Sprint 14 implementation is complete. Sprint 15 production launch preparation is in progress.
+> Status: v0.3.0 release candidate is deployed at [audit.aftabkhan.net](https://audit.aftabkhan.net). The public deployment uses deterministic demo mode, so it does not inspect screenshot pixels or incur provider cost.
 
 ## Overview
 
@@ -37,7 +37,7 @@ The application includes:
 - Vitest tests and GitHub Actions quality workflow
 - Production metadata, robots, sitemap, and baseline security headers
 
-Fixture mode returns schema-valid sample findings without inspecting screenshot pixels. OpenAI mode submits the screenshot and user context from the server route and validates the structured response before rendering it.
+Demo mode returns schema-valid sample findings without inspecting screenshot pixels. OpenAI mode submits the screenshot and user context from the server route and validates the structured response before rendering it. The interface labels the active mode so sample output cannot be mistaken for screenshot analysis.
 
 ## What It Demonstrates
 
@@ -147,6 +147,8 @@ npm run build
 - [Quality review](docs/QA-REVIEW.md)
 - [Release validation](docs/RELEASE-VALIDATION.md)
 - [Production deployment](docs/DEPLOYMENT.md)
+- [Architecture diagram](docs/ARCHITECTURE-DIAGRAM.md)
+- [Portfolio case study](docs/PORTFOLIO-CASE-STUDY.md)
 - [Release checklist](RELEASE-CHECKLIST.md)
 - [Roadmap](ROADMAP.md)
 - [Security and privacy](SECURITY.md)
