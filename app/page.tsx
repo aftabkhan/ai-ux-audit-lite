@@ -12,6 +12,8 @@ const reviewAreas = [
 ];
 
 export default function HomePage() {
+  const isFixtureMode = (process.env.AUDIT_PROVIDER ?? "fixture") === "fixture";
+
   return (
     <main id="top">
       <header className="site-header">
@@ -69,7 +71,12 @@ export default function HomePage() {
                 <p className="workspace-kicker">Structured UX reasoning</p>
                 <h2>Review one screen. Surface the decisions that matter.</h2>
               </div>
-              <span className="workspace-status">Fixture mode</span>
+              <span
+                className="workspace-status"
+                title={isFixtureMode ? "Deterministic sample output; the screenshot is not analyzed" : "Screenshot-aware AI review"}
+              >
+                {isFixtureMode ? "Demo mode" : "AI review mode"}
+              </span>
             </div>
             <AuditForm />
           </div>
