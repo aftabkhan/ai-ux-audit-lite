@@ -11,6 +11,7 @@ flowchart TD
 
     PF --> FP[Fixture provider]
     PF --> OP[OpenAI screenshot provider]
+    PF --> GP[Gemini screenshot provider]
 
     FP --> SV[Runtime response validation]
     OP --> SV
