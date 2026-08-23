@@ -74,11 +74,11 @@ Status: In progress
 - Complete keyboard and 200% zoom validation
 - Complete automated accessibility validation
 - Configure the selected production provider and cost controls
-- Deploy the application
+- [Complete] Deploy the application in cost-safe demo mode
 - Add repository screenshots and demo media
 - Add live URL to the repository profile
 - Publish final known limitations
-- Write portfolio case-study summary
+- [Complete] Write portfolio case-study summary
 
 ## Non-Goals
 
