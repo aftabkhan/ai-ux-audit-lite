@@ -80,14 +80,15 @@
 
 ## Portfolio release
 
-- [ ] Production deployment completed
-- [ ] Live URL added to README and repository About section
+- [x] Production deployment completed
+- [x] Live URL added to README
+- [ ] Live URL added to repository About section
 - [ ] Desktop and mobile screenshots added
 - [ ] Audit progress and results screenshots added
 - [ ] Short product demo recorded
-- [ ] Architecture diagram added
+- [x] Architecture diagram added
 - [x] Known limitations published
-- [ ] Portfolio case study written
+- [x] Portfolio case study written
 - [x] GitHub profile links to the public repository
 - [ ] Private interview guide updated with final Sprint 14 decisions
 
