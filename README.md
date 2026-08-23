@@ -21,7 +21,7 @@ The application includes:
 - Server-side `/api/audit` route
 - Provider-independent audit interface
 - Deterministic fixture provider for safe local development
-- Screenshot-aware OpenAI provider behind the same server-side interface
+- Screenshot-aware Gemini and OpenAI providers behind the same server-side interface
 - Zod validation for context and provider responses
 - Stable public error mapping and no-store responses
 - Accessible staged progress and recovery messaging
@@ -37,7 +37,7 @@ The application includes:
 - Vitest tests and GitHub Actions quality workflow
 - Production metadata, robots, sitemap, and baseline security headers
 
-Demo mode returns schema-valid sample findings without inspecting screenshot pixels. OpenAI mode submits the screenshot and user context from the server route and validates the structured response before rendering it. The interface labels the active mode so sample output cannot be mistaken for screenshot analysis.
+Demo mode returns schema-valid sample findings without inspecting screenshot pixels. Gemini and OpenAI modes submit the screenshot and user context from the server route and validate the structured response before rendering it. The interface labels the active mode so sample output cannot be mistaken for screenshot analysis.
 
 ## What It Demonstrates
 
