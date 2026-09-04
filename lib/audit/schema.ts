@@ -11,7 +11,7 @@ export const auditCategorySchema = z.enum([
   "accessibility-basics",
 ]);
 
-export const severitySchema = z.enum(["high", "medium", "low"]);
+export const severitySchema = z.enum(["critical", "high", "medium", "low"]);
 export const confidenceSchema = z.enum(["high", "medium", "low"]);
 
 export const auditContextSchema = z.object({

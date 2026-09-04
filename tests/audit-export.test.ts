@@ -39,4 +39,57 @@ describe("auditToMarkdown", () => {
     expect(markdown).toContain("Primary action needs emphasis");
     expect(markdown).toContain(result.disclaimer);
   });
+
+  it("includes dedicated Human-in-the-Loop Triage Summary when triage state is supplied", () => {
+    const triage = {
+      "finding-1": {
+        status: "accepted" as const,
+        severity: "critical" as const,
+        originalSeverity: "medium" as const,
+      },
+      "finding-2": {
+        status: "dismissed" as const,
+        severity: "low" as const,
+        originalSeverity: "low" as const,
+      },
+    };
+
+    const triageSummary = {
+      acceptedCount: 1,
+      dismissedCount: 1,
+      overrideCount: 1,
+      baselineScore: 92,
+      adjustedScore: 82,
+    };
+
+    const multiResult: AuditResult = {
+      ...result,
+      findings: [
+        ...result.findings,
+        {
+          id: "finding-2",
+          title: "Minor label contrast issue",
+          severity: "low",
+          category: "accessibility-basics",
+          observation: "Footer link contrast is 4.1:1.",
+          impact: "Low vision users may struggle.",
+          recommendation: "Increase contrast to 4.5:1.",
+          confidence: "high",
+        },
+      ],
+    };
+
+    const markdown = auditToMarkdown(multiResult, triage, triageSummary);
+
+    expect(markdown).toContain("## Human-in-the-Loop Triage Summary");
+    expect(markdown).toContain("- Baseline AI Score: 92/100");
+    expect(markdown).toContain("- Final Adjusted Score: 82/100");
+    expect(markdown).toContain("- Accepted Findings: 1");
+    expect(markdown).toContain("- Dismissed / False Positives: 1");
+    expect(markdown).toContain("- Severity Overrides: 1");
+    expect(markdown).toContain("### Severity Overrides Detail");
+    expect(markdown).toContain("AI rated `medium` → Overridden to `critical`");
+    expect(markdown).toContain("- Status: Dismissed (False Positive)");
+    expect(markdown).toContain("[DISMISSED]");
+  });
 });

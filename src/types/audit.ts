@@ -11,8 +11,26 @@ export const AUDIT_CATEGORIES = [
 
 export type AuditCategory = (typeof AUDIT_CATEGORIES)[number];
 
-export const FINDING_SEVERITIES = ["high", "medium", "low"] as const;
+export const FINDING_SEVERITIES = ["critical", "high", "medium", "low"] as const;
 export type FindingSeverity = (typeof FINDING_SEVERITIES)[number];
+
+export type FindingTriageStatus = "accepted" | "dismissed";
+
+export interface FindingTriageState {
+  status: FindingTriageStatus;
+  severity: FindingSeverity;
+  originalSeverity: FindingSeverity;
+}
+
+export type AuditTriageMap = Record<string, FindingTriageState>;
+
+export interface AuditTriageSummary {
+  acceptedCount: number;
+  dismissedCount: number;
+  overrideCount: number;
+  baselineScore: number;
+  adjustedScore: number;
+}
 
 export const CONFIDENCE_LEVELS = ["high", "medium", "low"] as const;
 export type ConfidenceLevel = (typeof CONFIDENCE_LEVELS)[number];
