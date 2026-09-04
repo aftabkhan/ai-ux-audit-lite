@@ -11,8 +11,33 @@ export const AUDIT_CATEGORIES = [
 
 export type AuditCategory = (typeof AUDIT_CATEGORIES)[number];
 
-export const FINDING_SEVERITIES = ["high", "medium", "low"] as const;
+export const FINDING_SEVERITIES = ["critical", "high", "medium", "low"] as const;
 export type FindingSeverity = (typeof FINDING_SEVERITIES)[number];
+
+export type FindingTriageStatus = "unreviewed" | "accepted" | "dismissed";
+
+export interface FindingTriageState {
+  status: FindingTriageStatus;
+  severity: FindingSeverity;
+  originalSeverity: FindingSeverity;
+  reviewerNote?: string;
+}
+
+export type AuditTriageMap = Record<string, FindingTriageState>;
+
+export type AuditReviewStatus = "not-started" | "in-progress" | "completed";
+
+export interface AuditTriageSummary {
+  totalCount: number;
+  reviewedCount: number;
+  unreviewedCount: number;
+  acceptedCount: number;
+  dismissedCount: number;
+  overrideCount: number;
+  baselineScore: number;
+  adjustedScore: number;
+  reviewStatus: AuditReviewStatus;
+}
 
 export const CONFIDENCE_LEVELS = ["high", "medium", "low"] as const;
 export type ConfidenceLevel = (typeof CONFIDENCE_LEVELS)[number];
@@ -51,13 +76,13 @@ export interface AuditResult {
 
 export interface AuditError {
   code:
-    | "INVALID_FILE"
-    | "FILE_TOO_LARGE"
-    | "INVALID_REQUEST"
-    | "RATE_LIMITED"
-    | "PROVIDER_ERROR"
-    | "INVALID_RESPONSE"
-    | "UNKNOWN_ERROR";
+  | "INVALID_FILE"
+  | "FILE_TOO_LARGE"
+  | "INVALID_REQUEST"
+  | "RATE_LIMITED"
+  | "PROVIDER_ERROR"
+  | "INVALID_RESPONSE"
+  | "UNKNOWN_ERROR";
   message: string;
   recovery?: string;
 }

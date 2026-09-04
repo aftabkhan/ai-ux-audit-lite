@@ -1,6 +1,7 @@
 import type { AuditCategory, AuditFinding, FindingSeverity } from "@/src/types/audit";
 
 const severityPenalty: Record<FindingSeverity, number> = {
+  critical: 18,
   high: 12,
   medium: 6,
   low: 2,
