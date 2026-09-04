@@ -6,6 +6,7 @@ import { createAuditScorecard, describeScore } from "@/lib/audit/score";
 import type {
   AuditCategory,
   AuditResult,
+  AuditReviewStatus,
   AuditTriageMap,
   AuditTriageSummary,
   FindingSeverity,
@@ -21,7 +22,6 @@ type SeverityFilter = "all" | FindingSeverity;
 type CategoryFilter = "all" | AuditCategory;
 
 const severityOrder: FindingSeverity[] = ["critical", "high", "medium", "low"];
-const cycleOrder: FindingSeverity[] = ["critical", "high", "medium", "low"];
 
 export function AuditResults({ result, onReset }: AuditResultsProps) {
   const [severity, setSeverity] = useState<SeverityFilter>("all");
@@ -29,13 +29,14 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
   const [query, setQuery] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
 
-  // Initialize interactive triage state
+  // Initialize interactive triage state with "unreviewed" baseline
   const [triage, setTriage] = useState<AuditTriageMap>(() =>
     result.findings.reduce<AuditTriageMap>((acc, f) => {
       acc[f.id] = {
-        status: "accepted",
+        status: "unreviewed",
         severity: f.severity,
         originalSeverity: f.severity,
+        reviewerNote: "",
       };
       return acc;
     }, {}),
@@ -49,14 +50,32 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
     });
   }
 
-  function handleCycleSeverity(id: string) {
+  function handleSeverityChange(id: string, newSeverity: FindingSeverity) {
     setTriage((prev) => {
       const current = prev[id];
       if (!current) return prev;
-      const currentIndex = cycleOrder.indexOf(current.severity);
-      const nextIndex = (currentIndex + 1) % cycleOrder.length;
-      const nextSeverity = cycleOrder[nextIndex];
-      return { ...prev, [id]: { ...current, severity: nextSeverity } };
+      return {
+        ...prev,
+        [id]: {
+          ...current,
+          severity: newSeverity,
+          status: current.status === "unreviewed" ? "accepted" : current.status,
+        },
+      };
+    });
+  }
+
+  function handleNoteChange(id: string, note: string) {
+    setTriage((prev) => {
+      const current = prev[id];
+      if (!current) return prev;
+      return {
+        ...prev,
+        [id]: {
+          ...current,
+          reviewerNote: note,
+        },
+      };
     });
   }
 
@@ -67,9 +86,10 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
       return {
         ...prev,
         [id]: {
-          ...current,
-          status: "accepted",
+          status: "unreviewed",
           severity: current.originalSeverity,
+          originalSeverity: current.originalSeverity,
+          reviewerNote: "",
         },
       };
     });
@@ -78,11 +98,11 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
   // Baseline scorecard derived solely from AI findings
   const baselineScorecard = useMemo(() => createAuditScorecard(result.findings), [result.findings]);
 
-  // Active findings: accepted findings with their current (possibly overridden) severity
+  // Active findings: unreviewed and accepted findings apply their effective severity penalty. Dismissed findings contribute 0 penalty.
   const activeFindings = useMemo(
     () =>
       result.findings
-        .filter((finding) => triage[finding.id]?.status === "accepted")
+        .filter((finding) => triage[finding.id]?.status !== "dismissed")
         .map((finding) => ({
           ...finding,
           severity: triage[finding.id]?.severity ?? finding.severity,
@@ -96,23 +116,35 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
   // HITL summary statistics
   const triageSummary = useMemo<AuditTriageSummary>(() => {
     const entries = Object.values(triage);
+    const totalCount = result.findings.length;
     const acceptedCount = entries.filter((item) => item.status === "accepted").length;
     const dismissedCount = entries.filter((item) => item.status === "dismissed").length;
     const overrideCount = entries.filter((item) => item.severity !== item.originalSeverity).length;
+    const reviewedCount = acceptedCount + dismissedCount;
+    const unreviewedCount = Math.max(0, totalCount - reviewedCount);
+
+    let reviewStatus: AuditReviewStatus = "not-started";
+    if (reviewedCount === totalCount && totalCount > 0) {
+      reviewStatus = "completed";
+    } else if (reviewedCount > 0) {
+      reviewStatus = "in-progress";
+    }
 
     return {
+      totalCount,
+      reviewedCount,
+      unreviewedCount,
       acceptedCount,
       dismissedCount,
       overrideCount,
       baselineScore: baselineScorecard.overall,
       adjustedScore: scorecard.overall,
+      reviewStatus,
     };
-  }, [triage, baselineScorecard.overall, scorecard.overall]);
+  }, [triage, result.findings.length, baselineScorecard.overall, scorecard.overall]);
 
   const isScoreAdjusted =
-    triageSummary.dismissedCount > 0 ||
-    triageSummary.overrideCount > 0 ||
-    baselineScorecard.overall !== scorecard.overall;
+    triageSummary.adjustedScore !== triageSummary.baselineScore || triageSummary.overrideCount > 0;
 
   const categories = useMemo(
     () => Array.from(new Set(result.findings.map((finding) => finding.category))).sort(),
@@ -240,19 +272,25 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
       <div className="hitl-metrics-bar" aria-label="Human-in-the-loop review overview">
         <div className="hitl-stat">
           <span className="hitl-stat-label">Reviewed</span>
-          <span className="hitl-stat-value">{result.findings.length} findings</span>
+          <span className="hitl-stat-value">
+            {triageSummary.reviewedCount} / {triageSummary.totalCount}
+          </span>
         </div>
         <div className="hitl-stat">
           <span className="hitl-stat-label">Accepted</span>
           <span className="hitl-stat-value hitl-accepted">{triageSummary.acceptedCount}</span>
         </div>
         <div className="hitl-stat">
-          <span className="hitl-stat-label">Dismissed / False Positives</span>
+          <span className="hitl-stat-label">Dismissed</span>
           <span className="hitl-stat-value hitl-dismissed">{triageSummary.dismissedCount}</span>
         </div>
         <div className="hitl-stat">
-          <span className="hitl-stat-label">Severity Overrides</span>
+          <span className="hitl-stat-label">Overrides</span>
           <span className="hitl-stat-value hitl-overrides">{triageSummary.overrideCount}</span>
+        </div>
+        <div className="hitl-stat">
+          <span className="hitl-stat-label">Remaining</span>
+          <span className="hitl-stat-value hitl-remaining">{triageSummary.unreviewedCount}</span>
         </div>
       </div>
 
@@ -279,7 +317,10 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
           </ul>
         </section>
         <section aria-labelledby="priorities-heading">
-          <h3 id="priorities-heading">Priority actions</h3>
+          <h3 id="priorities-heading">AI Baseline — Priority Actions (Pre-Review)</h3>
+          <p className="priority-actions-caption">
+            Generated from the original AI audit before human review.
+          </p>
           <ol>
             {result.summary.priorityActions.map((action) => (
               <li key={action}>{action}</li>
@@ -378,13 +419,19 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
         <ol className="findings-list">
           {filteredFindings.map((finding, index) => {
             const itemTriage = triage[finding.id] ?? {
-              status: "accepted",
+              status: "unreviewed",
               severity: finding.severity,
               originalSeverity: finding.severity,
+              reviewerNote: "",
             };
             const isDismissed = itemTriage.status === "dismissed";
+            const isAccepted = itemTriage.status === "accepted";
+            const isUnreviewed = itemTriage.status === "unreviewed";
             const isOverridden = itemTriage.severity !== itemTriage.originalSeverity;
-            const isModified = isDismissed || isOverridden;
+            const isModified =
+              !isUnreviewed ||
+              isOverridden ||
+              Boolean(itemTriage.reviewerNote && itemTriage.reviewerNote.trim().length > 0);
 
             return (
               <li
@@ -410,6 +457,8 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
                           {isDismissed && (
                             <span className="dismissed-badge">Dismissed / False Positive</span>
                           )}
+                          {isAccepted && <span className="accepted-badge">Accepted</span>}
+                          {isUnreviewed && <span className="unreviewed-badge">Unreviewed</span>}
                           <span className="category-badge">{formatLabel(finding.category)}</span>
                         </span>
                         <span className="confidence-label">{finding.confidence} confidence</span>
@@ -450,8 +499,8 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
                   >
                     <button
                       type="button"
-                      className={`triage-btn triage-btn-accept ${!isDismissed ? "is-selected" : ""}`}
-                      aria-pressed={!isDismissed}
+                      className={`triage-btn triage-btn-accept ${isAccepted ? "is-selected" : ""}`}
+                      aria-pressed={isAccepted}
                       onClick={() => handleStatusChange(finding.id, "accepted")}
                     >
                       <span className="triage-icon" aria-hidden="true">
@@ -473,20 +522,37 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
                   </div>
 
                   <div className="triage-override-group">
-                    <button
-                      type="button"
-                      className="triage-cycle-btn"
-                      onClick={() => handleCycleSeverity(finding.id)}
-                      aria-label={`Override severity for ${finding.title}. Currently ${itemTriage.severity}. Press to cycle between Critical, High, Medium, and Low.`}
-                    >
-                      <span className="triage-cycle-label">Override Severity:</span>
-                      <span className={`triage-severity-tag severity-${itemTriage.severity}`}>
-                        {itemTriage.severity}
+                    <label htmlFor={`severity-${finding.id}`} className="sr-only">
+                      Override severity for {finding.title}
+                    </label>
+                    <div className="triage-select-wrapper">
+                      <span className="triage-select-label" id={`severity-label-${finding.id}`}>
+                        Severity:
                       </span>
-                      <span className="triage-cycle-icon" aria-hidden="true">
-                        &#x21bb;
+                      <select
+                        id={`severity-${finding.id}`}
+                        aria-labelledby={`severity-label-${finding.id}`}
+                        value={itemTriage.severity}
+                        onChange={(e) =>
+                          handleSeverityChange(finding.id, e.target.value as FindingSeverity)
+                        }
+                        className="triage-select"
+                      >
+                        <option value="critical">Critical</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </div>
+
+                    {isOverridden && (
+                      <span
+                        className="override-badge"
+                        aria-label={`Overridden from ${itemTriage.originalSeverity}`}
+                      >
+                        Overridden from {itemTriage.originalSeverity}
                       </span>
-                    </button>
+                    )}
 
                     {isModified && (
                       <button
@@ -498,6 +564,21 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
                         Reset to AI baseline
                       </button>
                     )}
+                  </div>
+
+                  <div className="reviewer-note-container">
+                    <label htmlFor={`note-${finding.id}`} className="note-label">
+                      Reviewer note (optional)
+                    </label>
+                    <textarea
+                      id={`note-${finding.id}`}
+                      value={itemTriage.reviewerNote ?? ""}
+                      onChange={(e) => handleNoteChange(finding.id, e.target.value)}
+                      placeholder="e.g., False positive: component is hidden on mobile viewport..."
+                      maxLength={500}
+                      rows={2}
+                      className="note-input"
+                    />
                   </div>
                 </div>
               </li>

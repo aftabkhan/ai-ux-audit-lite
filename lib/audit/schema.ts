@@ -45,3 +45,26 @@ export const auditResultSchema = z.object({
 });
 
 export type ValidatedAuditResult = z.infer<typeof auditResultSchema>;
+
+export const findingTriageStatusSchema = z.enum(["unreviewed", "accepted", "dismissed"]);
+
+export const findingTriageStateSchema = z.object({
+  status: findingTriageStatusSchema,
+  severity: severitySchema,
+  originalSeverity: severitySchema,
+  reviewerNote: z.string().max(500).optional(),
+});
+
+export const auditReviewStatusSchema = z.enum(["not-started", "in-progress", "completed"]);
+
+export const auditTriageSummarySchema = z.object({
+  totalCount: z.number().int().nonnegative(),
+  reviewedCount: z.number().int().nonnegative(),
+  unreviewedCount: z.number().int().nonnegative(),
+  acceptedCount: z.number().int().nonnegative(),
+  dismissedCount: z.number().int().nonnegative(),
+  overrideCount: z.number().int().nonnegative(),
+  baselineScore: z.number().int().min(0).max(100),
+  adjustedScore: z.number().int().min(0).max(100),
+  reviewStatus: auditReviewStatusSchema,
+});

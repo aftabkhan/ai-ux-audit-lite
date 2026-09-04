@@ -236,6 +236,10 @@
   color: var(--accent);
 }
 
+.hitl-stat-value.hitl-remaining {
+  color: var(--muted);
+}
+
 /* ── Severity: Critical ── */
 
 .severity-summary-card.severity-critical {
@@ -280,6 +284,39 @@
   font-weight: 750;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+.accepted-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.55rem;
+  border-radius: var(--radius-pill);
+  background: rgba(2, 122, 72, 0.12);
+  border: 1px solid rgba(2, 122, 72, 0.3);
+  color: #027a48;
+  font-size: 0.74rem;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+}
+
+.unreviewed-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.55rem;
+  border-radius: var(--radius-pill);
+  background: rgba(122, 110, 96, 0.08);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+}
+
+.priority-actions-caption {
+  margin: -0.5rem 0 1rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-style: italic;
 }
 
 .findings-subtitle {
@@ -449,6 +486,79 @@
   color: var(--text);
   border-color: var(--text);
   background: var(--surface-subtle);
+}
+
+.triage-select-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.triage-select-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.triage-select {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 180ms var(--ease-out);
+}
+
+.triage-select:hover {
+  border-color: var(--accent);
+}
+
+.triage-select:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(232, 168, 76, 0.25);
+}
+
+.reviewer-note-container {
+  width: 100%;
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border);
+}
+
+.note-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.note-input {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  resize: vertical;
+  transition: all 180ms var(--ease-out);
+}
+
+.note-input:hover {
+  border-color: var(--muted);
+}
+
+.note-input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-color: var(--accent);
 }
 
 /* ── Responsive adjustments ── */

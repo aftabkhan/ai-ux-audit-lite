@@ -23,13 +23,16 @@ export function auditToMarkdown(
       : [];
 
     hitlSection = [
-      "## Human-in-the-Loop Triage Summary",
+      "## Human-in-the-Loop (HITL) Triage Summary",
       "",
+      `- Review Status: ${triageSummary.reviewStatus}`,
       `- Baseline AI Score: ${triageSummary.baselineScore}/100`,
-      `- Final Adjusted Score: ${triageSummary.adjustedScore}/100`,
+      `- Adjusted Directional Score: ${triageSummary.adjustedScore}/100`,
+      `- Reviewed Findings: ${triageSummary.reviewedCount} / ${triageSummary.totalCount}`,
       `- Accepted Findings: ${triageSummary.acceptedCount}`,
-      `- Dismissed / False Positives: ${triageSummary.dismissedCount}`,
+      `- Dismissed (False Positives): ${triageSummary.dismissedCount}`,
       `- Severity Overrides: ${triageSummary.overrideCount}`,
+      `- Remaining Unreviewed: ${triageSummary.unreviewedCount}`,
       ...(overrideLines.length
         ? ["", "### Severity Overrides Detail", "", ...overrideLines]
         : []),
@@ -39,17 +42,27 @@ export function auditToMarkdown(
   const findings = result.findings
     .map((finding, index) => {
       const itemTriage = triage?.[finding.id];
+      const status = itemTriage?.status ?? "unreviewed";
       const effectiveSeverity = itemTriage?.severity ?? finding.severity;
-      const isDismissed = itemTriage?.status === "dismissed";
+      const isDismissed = status === "dismissed";
       const isOverridden = itemTriage && itemTriage.severity !== itemTriage.originalSeverity;
 
+      const formatStatus = (s: string) => {
+        if (s === "accepted") return "Accepted";
+        if (s === "dismissed") return "Dismissed";
+        return "Unreviewed";
+      };
+
       const metaLines = [
-        `- Status: ${isDismissed ? "Dismissed (False Positive)" : "Accepted"}`,
+        `- Review Status: ${formatStatus(status)}`,
         `- Severity: ${effectiveSeverity}${
-          isOverridden ? ` (Adjusted by reviewer from ${itemTriage.originalSeverity})` : ""
+          isOverridden ? ` (Overridden from ${itemTriage.originalSeverity})` : ""
         }`,
         `- Category: ${finding.category}`,
         `- Confidence: ${finding.confidence}`,
+        ...(itemTriage?.reviewerNote?.trim()
+          ? [`- Reviewer Note: ${itemTriage.reviewerNote.trim()}`]
+          : []),
       ];
 
       return (
@@ -78,7 +91,7 @@ export function auditToMarkdown(
     "",
     ...result.summary.strengths.map((item) => `- ${item}`),
     "",
-    "### Priority actions",
+    "### AI Baseline — Priority Actions (Pre-Review)",
     "",
     ...result.summary.priorityActions.map((item) => `- ${item}`),
     "",
@@ -99,16 +112,21 @@ export function downloadAuditJson(
   triage?: AuditTriageMap,
   triageSummary?: AuditTriageSummary,
 ): void {
-  const payload = {
-    ...result,
-    humanReview: triageSummary
-      ? {
-          reviewedAt: new Date().toISOString(),
-          triageSummary,
-          triage,
-        }
-      : undefined,
-  };
+  const now = new Date().toISOString();
+  const payload = triageSummary
+    ? {
+        aiBaseline: result,
+        humanReview: {
+          status: triageSummary.reviewStatus,
+          triage: triage ?? {},
+          summary: triageSummary,
+          exportedAt: now,
+          ...(triageSummary.reviewStatus === "completed" ? { completedAt: now } : {}),
+        },
+      }
+    : {
+        ...result,
+      };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   downloadBlob(blob, "ai-ux-audit-report.json");
 }

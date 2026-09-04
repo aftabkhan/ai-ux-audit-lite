@@ -47,17 +47,33 @@ describe("AuditResults HITL Review Experience", () => {
     vi.clearAllMocks();
   });
 
-  it("renders with default accepted findings and baseline score without adjustment badge", () => {
+  it("renders with default unreviewed findings, reviewedCount=0, and no adjustment badge", () => {
     render(<AuditResults result={mockResult} onReset={() => {}} />);
 
     // Baseline: high (12) + medium (6) = 18 penalty => 82
-    expect(screen.getByText("82")).toBeInTheDocument();
+    expect(document.querySelector(".score-value strong")).toHaveTextContent("82");
     expect(screen.queryByText(/Score adjusted by Human Reviewer/)).not.toBeInTheDocument();
 
-    // Default triage buttons are rendered and "Accept Finding" is selected
+    // Metrics banner initial status
+    expect(screen.getByText("0 / 2")).toBeInTheDocument(); // Reviewed: 0 / 2
+    expect(screen.getAllByText("Unreviewed")).toHaveLength(2);
+
+    // AI Baseline Priority Actions Provenance
+    expect(screen.getByText("AI Baseline — Priority Actions (Pre-Review)")).toBeInTheDocument();
+    expect(
+      screen.getByText("Generated from the original AI audit before human review."),
+    ).toBeInTheDocument();
+  });
+
+  it("transitions finding to accepted when 'Accept Finding' is clicked, marking review in-progress", () => {
+    render(<AuditResults result={mockResult} onReset={() => {}} />);
+
     const acceptButtons = screen.getAllByRole("button", { name: /Accept Finding/i });
-    expect(acceptButtons).toHaveLength(2);
+    fireEvent.click(acceptButtons[0]);
+
     expect(acceptButtons[0]).toHaveAttribute("aria-pressed", "true");
+    // Reviewed count is now 1 / 2, remaining 1
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
   });
 
   it("recalculates score and displays adjustment badge when a finding is dismissed", () => {
@@ -80,33 +96,54 @@ describe("AuditResults HITL Review Experience", () => {
     expect(screen.getByText("Dismissed / False Positive")).toBeInTheDocument();
   });
 
-  it("cycles severity when Override Severity button is clicked and recalculates score", () => {
+  it("updates effective penalty and registers an override when severity select changes", () => {
     render(<AuditResults result={mockResult} onReset={() => {}} />);
 
-    // Cycle order: critical -> high -> medium -> low -> critical
-    // Finding 1 starts as 'high'. Next is 'medium'.
-    const cycleButtons = screen.getAllByRole("button", { name: /Override severity/i });
-    fireEvent.click(cycleButtons[0]);
+    const selects = screen.getAllByRole("combobox", { name: /Severity:/i });
+    // f-1 is high (12 penalty). Change to critical (18 penalty).
+    fireEvent.change(selects[0], { target: { value: "critical" } });
 
-    // f-1 is now medium (6), f-2 is medium (6) => penalty 12 => score 88 (up from 82)
-    expect(document.querySelector(".score-value strong")).toHaveTextContent("88");
-    expect(screen.getByText(/Overridden from high/i)).toBeInTheDocument();
-    expect(screen.getByText("+6 pts")).toBeInTheDocument();
-
-    // Cycle again: medium -> low (penalty 2) => penalty 2 + 6 = 8 => score 92
-    fireEvent.click(cycleButtons[0]);
-    expect(document.querySelector(".score-value strong")).toHaveTextContent("92");
-
-    // Cycle again: low -> critical (penalty 18) => penalty 18 + 6 = 24 => score 76
-    fireEvent.click(cycleButtons[0]);
+    // Critical (18) + Medium (6) = 24 penalty => 76 score
     expect(document.querySelector(".score-value strong")).toHaveTextContent("76");
+    expect(screen.getAllByText(/Overridden from high/i).length).toBeGreaterThan(0);
     expect(screen.getByText("-6 pts")).toBeInTheDocument();
+  });
 
-    // Reset button should restore finding to high (baseline 82)
-    const resetBtn = screen.getByRole("button", { name: /Reset to AI baseline/i });
+  it("persists reviewer note across status changes and clears it on reset", () => {
+    render(<AuditResults result={mockResult} onReset={() => {}} />);
+
+    const textareas = screen.getAllByLabelText(/Reviewer note \(optional\)/i);
+    fireEvent.change(textareas[0], {
+      target: { value: "False positive: icon is hidden on small screens" },
+    });
+
+    expect(textareas[0]).toHaveValue("False positive: icon is hidden on small screens");
+
+    // Click Accept Finding
+    const acceptButtons = screen.getAllByRole("button", { name: /Accept Finding/i });
+    fireEvent.click(acceptButtons[0]);
+    // Note remains intact
+    expect(textareas[0]).toHaveValue("False positive: icon is hidden on small screens");
+
+    // Click Reset to AI baseline
+    const resetBtn = screen.getByRole("button", { name: /Reset to AI baseline: Primary call to action lacks contrast/i });
     fireEvent.click(resetBtn);
-    expect(document.querySelector(".score-value strong")).toHaveTextContent("82");
-    expect(screen.queryByText(/Score adjusted by Human Reviewer/)).not.toBeInTheDocument();
+
+    // Note is cleared, finding returns to unreviewed
+    expect(textareas[0]).toHaveValue("");
+    expect(screen.getAllByText("Unreviewed")).toHaveLength(2);
+  });
+
+  it("flips reviewStatus to completed when all items are triaged", () => {
+    render(<AuditResults result={mockResult} onReset={() => {}} />);
+
+    const acceptButtons = screen.getAllByRole("button", { name: /Accept Finding/i });
+    fireEvent.click(acceptButtons[0]);
+    fireEvent.click(acceptButtons[1]);
+
+    // All items triaged: 2 / 2 reviewed, 0 remaining
+    expect(screen.getByText("2 / 2")).toBeInTheDocument();
+    expect(document.querySelector(".hitl-stat-value.hitl-remaining")).toHaveTextContent("0");
   });
 
   it("supports keyboard activation on triage controls", () => {
