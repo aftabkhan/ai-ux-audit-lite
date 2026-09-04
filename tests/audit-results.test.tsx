@@ -99,9 +99,11 @@ describe("AuditResults HITL Review Experience", () => {
   it("updates effective penalty and registers an override when severity select changes", () => {
     render(<AuditResults result={mockResult} onReset={() => {}} />);
 
-    const selects = screen.getAllByRole("combobox", { name: /Severity:/i });
+    const select = screen.getByRole("combobox", {
+      name: `Override severity for ${mockResult.findings[0].title}`,
+    });
     // f-1 is high (12 penalty). Change to critical (18 penalty).
-    fireEvent.change(selects[0], { target: { value: "critical" } });
+    fireEvent.change(select, { target: { value: "critical" } });
 
     // Critical (18) + Medium (6) = 24 penalty => 76 score
     expect(document.querySelector(".score-value strong")).toHaveTextContent("76");
@@ -112,25 +114,56 @@ describe("AuditResults HITL Review Experience", () => {
   it("persists reviewer note across status changes and clears it on reset", () => {
     render(<AuditResults result={mockResult} onReset={() => {}} />);
 
-    const textareas = screen.getAllByLabelText(/Reviewer note \(optional\)/i);
-    fireEvent.change(textareas[0], {
+    // Note input is progressively disclosed: click "+ Add note" to reveal textarea
+    const addNoteBtn = screen.getAllByRole("button", { name: /\+ Add note/i })[0];
+    fireEvent.click(addNoteBtn);
+
+    const textarea = screen.getByLabelText(`Reviewer note for ${mockResult.findings[0].title}`);
+    fireEvent.change(textarea, {
       target: { value: "False positive: icon is hidden on small screens" },
     });
 
-    expect(textareas[0]).toHaveValue("False positive: icon is hidden on small screens");
+    expect(textarea).toHaveValue("False positive: icon is hidden on small screens");
+
+    // Click Done to collapse the note editor
+    const doneBtn = screen.getByRole("button", {
+      name: `Done editing note for ${mockResult.findings[0].title}`,
+    });
+    fireEvent.click(doneBtn);
+
+    // Collapsed preview tag is displayed and toggle now says "Edit note"
+    expect(screen.getByText(/False positive: icon is hidden on small screens/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Edit note/i }),
+    ).toBeInTheDocument();
 
     // Click Accept Finding
     const acceptButtons = screen.getAllByRole("button", { name: /Accept Finding/i });
     fireEvent.click(acceptButtons[0]);
-    // Note remains intact
-    expect(textareas[0]).toHaveValue("False positive: icon is hidden on small screens");
+
+    // Note preview remains intact across status changes
+    expect(screen.getByText(/False positive: icon is hidden on small screens/)).toBeInTheDocument();
+
+    // Reopen note and verify value persisted
+    fireEvent.click(
+      screen.getByRole("button", { name: /Edit note/i }),
+    );
+    const reopenedTextarea = screen.getByLabelText(
+      `Reviewer note for ${mockResult.findings[0].title}`,
+    );
+    expect(reopenedTextarea).toHaveValue("False positive: icon is hidden on small screens");
 
     // Click Reset to AI baseline
-    const resetBtn = screen.getByRole("button", { name: /Reset to AI baseline: Primary call to action lacks contrast/i });
+    const resetBtn = screen.getByRole("button", {
+      name: /Reset to AI baseline: Primary call to action lacks contrast/i,
+    });
     fireEvent.click(resetBtn);
 
-    // Note is cleared, finding returns to unreviewed
-    expect(textareas[0]).toHaveValue("");
+    // Note is cleared, reset collapses editor and restores "+ Add note"
+    expect(screen.getAllByRole("button", { name: /\+ Add note/i })).toHaveLength(2);
+    expect(
+      screen.queryByText(/False positive: icon is hidden on small screens/),
+    ).not.toBeInTheDocument();
     expect(screen.getAllByText("Unreviewed")).toHaveLength(2);
   });
 

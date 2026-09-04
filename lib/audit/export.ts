@@ -121,7 +121,6 @@ export function downloadAuditJson(
           triage: triage ?? {},
           summary: triageSummary,
           exportedAt: now,
-          ...(triageSummary.reviewStatus === "completed" ? { completedAt: now } : {}),
         },
       }
     : {

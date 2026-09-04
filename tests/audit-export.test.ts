@@ -158,7 +158,9 @@ describe("auditToMarkdown", () => {
       const parsedCompleted = JSON.parse(exportedBlobContent);
 
       expect(parsedCompleted.humanReview.status).toBe("completed");
-      expect(parsedCompleted.humanReview.completedAt).toBeDefined();
+      expect(parsedCompleted.humanReview.exportedAt).toBeDefined();
+      expect(parsedCompleted.humanReview.completedAt).toBeUndefined();
+      expect(parsedCompleted.humanReview.reviewedAt).toBeUndefined();
     } finally {
       vi.unstubAllGlobals();
       HTMLAnchorElement.prototype.click = originalClick;

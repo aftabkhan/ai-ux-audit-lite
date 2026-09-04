@@ -522,13 +522,101 @@
   box-shadow: 0 0 0 3px rgba(232, 168, 76, 0.25);
 }
 
+.reviewer-note-section {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border);
+}
+
+.reviewer-note-collapsed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.note-preview-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-style: italic;
+  max-width: min(100%, 480px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-preview-label {
+  font-weight: 700;
+  font-style: normal;
+  color: var(--accent);
+}
+
+.note-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.65rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 180ms var(--ease-out);
+}
+
+.note-toggle-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--surface-subtle);
+}
+
+.note-toggle-btn:focus-visible,
+.note-done-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(232, 168, 76, 0.25);
+}
+
 .reviewer-note-container {
   width: 100%;
   display: grid;
   gap: 0.35rem;
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px dashed var(--border);
+}
+
+.note-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.note-done-btn {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 180ms var(--ease-out);
+}
+
+.note-done-btn:hover {
+  background: var(--surface-subtle);
+  border-color: var(--accent);
 }
 
 .note-label {

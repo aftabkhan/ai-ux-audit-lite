@@ -79,6 +79,15 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
     });
   }
 
+  const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
+
+  function toggleNoteExpanded(id: string) {
+    setExpandedNotes((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  }
+
   function handleResetFinding(id: string) {
     setTriage((prev) => {
       const current = prev[id];
@@ -93,6 +102,10 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
         },
       };
     });
+    setExpandedNotes((prev) => ({
+      ...prev,
+      [id]: false,
+    }));
   }
 
   // Baseline scorecard derived solely from AI findings
@@ -522,16 +535,16 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
                   </div>
 
                   <div className="triage-override-group">
-                    <label htmlFor={`severity-${finding.id}`} className="sr-only">
+                    <label htmlFor={`severity-select-${finding.id}`} className="sr-only">
                       Override severity for {finding.title}
                     </label>
                     <div className="triage-select-wrapper">
-                      <span className="triage-select-label" id={`severity-label-${finding.id}`}>
+                      <span className="triage-select-label" aria-hidden="true">
                         Severity:
                       </span>
                       <select
-                        id={`severity-${finding.id}`}
-                        aria-labelledby={`severity-label-${finding.id}`}
+                        id={`severity-select-${finding.id}`}
+                        aria-label={`Override severity for ${finding.title}`}
                         value={itemTriage.severity}
                         onChange={(e) =>
                           handleSeverityChange(finding.id, e.target.value as FindingSeverity)
@@ -566,19 +579,55 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
                     )}
                   </div>
 
-                  <div className="reviewer-note-container">
-                    <label htmlFor={`note-${finding.id}`} className="note-label">
-                      Reviewer note (optional)
-                    </label>
-                    <textarea
-                      id={`note-${finding.id}`}
-                      value={itemTriage.reviewerNote ?? ""}
-                      onChange={(e) => handleNoteChange(finding.id, e.target.value)}
-                      placeholder="e.g., False positive: component is hidden on mobile viewport..."
-                      maxLength={500}
-                      rows={2}
-                      className="note-input"
-                    />
+                  <div className="reviewer-note-section">
+                    {Boolean(expandedNotes[finding.id]) ? (
+                      <div className="reviewer-note-container" id={`note-container-${finding.id}`}>
+                        <div className="note-header-row">
+                          <label htmlFor={`note-${finding.id}`} className="note-label">
+                            Reviewer note for {finding.title}
+                          </label>
+                          <button
+                            type="button"
+                            className="note-done-btn"
+                            onClick={() => toggleNoteExpanded(finding.id)}
+                            aria-label={`Done editing note for ${finding.title}`}
+                          >
+                            Done
+                          </button>
+                        </div>
+                        <textarea
+                          id={`note-${finding.id}`}
+                          value={itemTriage.reviewerNote ?? ""}
+                          onChange={(e) => handleNoteChange(finding.id, e.target.value)}
+                          placeholder="e.g., False positive: component is hidden on mobile viewport..."
+                          maxLength={500}
+                          rows={2}
+                          className="note-input"
+                          autoFocus
+                        />
+                      </div>
+                    ) : (
+                      <div className="reviewer-note-collapsed">
+                        {Boolean(itemTriage.reviewerNote?.trim()) && (
+                          <span className="note-preview-tag" title={itemTriage.reviewerNote}>
+                            <span className="note-preview-label">Note:</span> &ldquo;
+                            {itemTriage.reviewerNote && itemTriage.reviewerNote.length > 50
+                              ? `${itemTriage.reviewerNote.slice(0, 50).trim()}…`
+                              : itemTriage.reviewerNote}
+                            &rdquo;
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          className="note-toggle-btn"
+                          onClick={() => toggleNoteExpanded(finding.id)}
+                          aria-expanded="false"
+                          aria-controls={`note-container-${finding.id}`}
+                        >
+                          {Boolean(itemTriage.reviewerNote?.trim()) ? "Edit note" : "+ Add note"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </li>
