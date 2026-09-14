@@ -1,84 +1,32 @@
 # AI UX Audit Lite
 
-A focused public portfolio project demonstrating AI-assisted UX analysis, accessible frontend engineering, and structured product thinking.
+A focused public portfolio product demonstrating AI-assisted UX analysis, human-in-the-loop review, accessibility-aware product thinking, and structured UX engineering.
 
-> Status: v0.3.0 release candidate is deployed at [audit.aftabkhan.net](https://audit.aftabkhan.net). The public deployment uses deterministic demo mode, so it does not inspect screenshot pixels or incur provider cost.
+> Status: active product / public portfolio candidate. The product is not a formal accessibility certification or compliance tool.
 
-## Overview
+## Product direction
 
-AI UX Audit Lite lets a user upload one interface screenshot, add optional context, and request a structured first-pass UX review across a limited set of common heuristics.
+AI UX Audit Lite should demonstrate a complete review lifecycle rather than a generic "AI found issues" experience:
 
-The project is intentionally small and limited to generic, explainable portfolio functionality.
+screenshot/context input → structured AI-assisted findings → human triage → explicit severity override/rationale → reviewed result → provenance-preserving export → persistent/history workflow when implemented.
 
-## Current Experience
+The current repository includes provider abstraction, runtime validation, filtering/export, automated quality checks, and HITL triage work with unreviewed state, review status, explicit severity override, reviewer notes, and separation of AI baseline from human review.
 
-The application includes:
+## AI and trust model
 
-- Responsive Next.js App Router interface
-- Accessible screenshot picker and local preview
-- PNG, JPEG, and WebP validation with a 5 MB limit
-- Optional screen title, target-user, and product-context fields
-- Server-side `/api/audit` route
-- Provider-independent audit interface
-- Deterministic fixture provider for safe local development
-- Screenshot-aware Gemini and OpenAI providers behind the same server-side interface
-- Zod validation for context and provider responses
-- Stable public error mapping and no-store responses
-- Accessible staged progress and recovery messaging
-- Transparent directional UX score and category overview
-- Audit summary with strengths and priority actions
-- Severity counts and structured findings
-- Search, severity filters, and category filters
-- Expandable detailed findings
-- Markdown copy and download
-- JSON download
-- Reset and new-review flow
-- Lightweight request rate limiting
-- Vitest tests and GitHub Actions quality workflow
-- Production metadata, robots, sitemap, and baseline security headers
+AI is a first-pass assistant. Findings are suggestions until reviewed. Structured output is validated before it reaches product state, and human decisions must not destroy the original AI baseline. Do not claim formal accessibility compliance from AI output.
 
-Demo mode returns schema-valid sample findings without inspecting screenshot pixels. Gemini and OpenAI modes submit the screenshot and user context from the server route and validate the structured response before rendering it. The interface labels the active mode so sample output cannot be mistaken for screenshot analysis.
+## Next product-completion priorities
 
-## What It Demonstrates
+- persistent audit records where appropriate;
+- reopen/read/update/archive/delete lifecycle;
+- clear history/version semantics;
+- robust loading, empty, timeout, malformed-output and recovery states;
+- privacy controls for screenshots/context;
+- critical-flow integration/E2E coverage;
+- recruiter-usable public workflow that can be completed without explanation.
 
-- UX evaluation and heuristic reasoning
-- AI provider abstraction and structured-response design
-- React and Next.js architecture
-- TypeScript data modeling
-- Accessible form and results experiences
-- Runtime validation and safe error handling
-- Client-side report transformation and export
-- Automated quality checks
-- Privacy-aware server boundaries
-- Product scoping and technical documentation
-
-## MVP
-
-The first release supports:
-
-- One PNG, JPG, or WebP screenshot
-- Optional screen title, product context, and target-user context
-- Eight limited UX review categories
-- Summary and findings grouped by severity
-- Actionable recommendations
-- Transparent directional scoring
-- Search and report filtering
-- Markdown copy and download
-- JSON download
-- Clear AI-assisted review limitations
-
-The MVP does not include crawling, accounts, saved history, benchmarking, continuous monitoring, formal accessibility certification, or commercial scoring.
-
-## Review Categories
-
-1. Visual hierarchy
-2. Navigation and orientation
-3. Clarity of actions
-4. Consistency
-5. Readability
-6. Feedback and system status
-7. Error prevention and recovery
-8. Accessibility basics
+These are requirements, not claims of current implementation.
 
 ## Stack
 
@@ -92,19 +40,7 @@ The MVP does not include crawling, accounts, saved history, benchmarking, contin
 - GitHub Actions
 - Server-side provider adapter
 
-## Quality Status
-
-The `Quality / verify` workflow runs:
-
-- Reproducible dependency installation with `npm ci`
-- Typecheck
-- Lint
-- Unit tests
-- Production build
-
-Historical failed workflow runs remain visible because GitHub preserves past CI results. The latest protected-branch result represents the current code state.
-
-## Run Locally
+## Local development
 
 ```bash
 npm ci
@@ -112,59 +48,29 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+The safe local default uses the fixture provider unless a supported AI provider is explicitly configured.
 
-The safe local default is:
-
-```env
-AUDIT_PROVIDER=fixture
-```
-
-Run the complete quality gate:
+Run the quality gate:
 
 ```bash
 npm run verify
 ```
 
-Individual commands:
-
-```bash
-npm run typecheck
-npm run lint
-npm run test
-npm run build
-```
-
 ## Documentation
 
-- [Product brief](docs/PRODUCT-BRIEF.md)
-- [MVP scope](docs/MVP-SCOPE.md)
-- [UX flow](docs/UX-FLOW.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Audit schema](docs/AUDIT-SCHEMA.md)
-- [Intelligent audit engine](docs/INTELLIGENT-AUDIT-ENGINE.md)
-- [Product experience](docs/PRODUCT-EXPERIENCE.md)
-- [Quality review](docs/QA-REVIEW.md)
-- [Release validation](docs/RELEASE-VALIDATION.md)
-- [Production deployment](docs/DEPLOYMENT.md)
-- [Architecture diagram](docs/ARCHITECTURE-DIAGRAM.md)
-- [Portfolio case study](docs/PORTFOLIO-CASE-STUDY.md)
-- [Release checklist](RELEASE-CHECKLIST.md)
-- [Roadmap](ROADMAP.md)
-- [Security and privacy](SECURITY.md)
-- [Contributing](CONTRIBUTING.md)
+- [`docs/README.md`](docs/README.md) — documentation map and authority order
+- [`docs/CURRENT-PRODUCT-DIRECTION.md`](docs/CURRENT-PRODUCT-DIRECTION.md) — current product/UX/AI/security/reliability bar
+- [`docs/PRODUCT-BRIEF.md`](docs/PRODUCT-BRIEF.md) — product framing
+- [`docs/PRODUCT-EXPERIENCE.md`](docs/PRODUCT-EXPERIENCE.md) and [`docs/UX-FLOW.md`](docs/UX-FLOW.md) — experience references
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/AUDIT-SCHEMA.md`](docs/AUDIT-SCHEMA.md) — implementation contracts
+- [`docs/QA-REVIEW.md`](docs/QA-REVIEW.md), [`docs/RELEASE-VALIDATION.md`](docs/RELEASE-VALIDATION.md) — quality/release evidence
+- [`SECURITY.md`](SECURITY.md) — security/privacy guidance
 
-The canonical TypeScript contract is available in [`src/types/audit.ts`](src/types/audit.ts), with runtime validation in [`lib/audit/schema.ts`](lib/audit/schema.ts).
+Older sprint/release documents remain useful traceability but do not override the current product direction.
 
 ## Privacy
 
-Do not upload or commit confidential, personal, client-owned, employer-owned, regulated, or NDA-protected interface screenshots.
-
-The application does not persist screenshots or audit history. Raw images and user context must not be written to logs. Provider-side handling must be reviewed against the deployment configuration before public release.
-
-## Disclaimer
-
-AI UX Audit Lite provides an AI-assisted first-pass review. It does not provide a formal UX audit, legal opinion, accessibility certification, security assessment, or compliance determination.
+Do not upload or commit confidential, personal, client-owned, employer-owned, regulated, or NDA-protected interface screenshots. Raw images and user context should not be written to logs. Provider-side handling must be reviewed against deployment configuration before public use.
 
 ## License
 
