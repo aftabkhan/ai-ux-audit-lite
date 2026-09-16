@@ -36,38 +36,55 @@ export class GeminiAuditProvider implements AuditProvider {
     const model = process.env.GEMINI_AUDIT_MODEL ?? "gemini-3.6-flash";
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { text: buildAuditPrompt(input.context) },
-              {
-                inlineData: {
-                  mimeType: input.image.mimeType,
-                  data: Buffer.from(input.image.bytes).toString("base64"),
-                },
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0.2,
+    let response: Response;
+    try {
+      response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
         },
-      }),
-      signal: AbortSignal.timeout(60_000),
-    });
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { text: buildAuditPrompt(input.context) },
+                {
+                  inlineData: {
+                    mimeType: input.image.mimeType,
+                    data: Buffer.from(input.image.bytes).toString("base64"),
+                  },
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.2,
+          },
+        }),
+        signal: AbortSignal.timeout(60_000),
+      });
+    } catch (error) {
+      if (isTimeoutError(error)) {
+        throw new AuditServiceError(
+          "PROVIDER_TIMEOUT",
+          "The AI provider took too long to complete the audit.",
+          504,
+          "Your inputs are still available. Retry the audit in a moment.",
+        );
+      }
+      throw new AuditServiceError(
+        "PROVIDER_ERROR",
+        "The AI provider could not be reached.",
+        502,
+        "Check your connection and retry the audit.",
+      );
+    }
 
     if (!response.ok) {
-      const detail = await response.text();
-      console.error("Gemini audit request failed", response.status, detail.slice(0, 500));
+      console.error("Gemini audit request failed", { status: response.status });
       throw new AuditServiceError(
         "PROVIDER_ERROR",
         "The AI provider could not complete the screenshot review.",
@@ -94,7 +111,7 @@ export class GeminiAuditProvider implements AuditProvider {
 
     const validated = auditResultSchema.safeParse(result);
     if (!validated.success) {
-      console.error("Gemini audit response failed validation", validated.error.flatten());
+      console.error("Gemini audit response failed validation", { issueCount: validated.error.issues.length });
       throw new AuditServiceError(
         "INVALID_RESPONSE",
         "The AI provider returned an incomplete audit report.",
@@ -105,6 +122,10 @@ export class GeminiAuditProvider implements AuditProvider {
 
     return validated.data;
   }
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError");
 }
 
 function extractOutputText(response: GeminiResponse): string {
