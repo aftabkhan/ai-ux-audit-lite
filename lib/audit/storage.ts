@@ -167,7 +167,7 @@ export async function updateAudit(
   if (parsed.expectedOutcome !== undefined) body.expected_outcome = parsed.expectedOutcome || null;
 
   const rows = await request<AuditRow[]>(
-    `/rest/v1/ai_ux_audits?id=${eq(auditId)}&reviewer_id=${eq(context.reviewerId)}&status=neq.archived`,
+    `/rest/v1/ai_ux_audits?id=${eq(auditId)}&reviewer_id=${eq(context.reviewerId)}&status=neq.archived&status=neq.finalized`,
     {
       method: "PATCH",
       headers: { Prefer: "return=representation" },
@@ -207,22 +207,19 @@ export async function updateHumanReview(
 ): Promise<PersistedHumanReview | null> {
   assertAuditContext(context);
   const parsed = humanReviewUpdateSchema.parse(input);
-  const now = new Date().toISOString();
-  const rows = await request<ReviewRow[]>(
-    `/rest/v1/ai_ux_audit_reviews?finding_id=${eq(findingId)}&audit_id=${eq(auditId)}&reviewer_id=${eq(context.reviewerId)}`,
-    {
-      method: "PATCH",
-      headers: { Prefer: "return=representation" },
-      body: JSON.stringify({
-        status: parsed.status,
-        severity_override: parsed.severityOverride ?? null,
-        reviewer_note: parsed.reviewerNote ?? null,
-        approved_recommendation: parsed.approvedRecommendation ?? null,
-        reviewed_at: parsed.status === "unreviewed" ? null : now,
-        updated_at: now,
-      }),
-    },
-  );
+  const rows = await request<ReviewRow[]>("/rest/v1/rpc/update_ai_ux_audit_review", {
+    method: "POST",
+    body: JSON.stringify({
+      p_audit_id: auditId,
+      p_reviewer_id: context.reviewerId,
+      p_finding_id: findingId,
+      p_status: parsed.status,
+      p_severity_override: parsed.severityOverride ?? null,
+      p_reviewer_note: parsed.reviewerNote ?? null,
+      p_approved_recommendation: parsed.approvedRecommendation ?? null,
+    }),
+  });
+  if (rows.length > 1) throw new Error("Audit review update returned an unexpected result.");
   return rows[0] ? toPersistedReview(rows[0]) : null;
 }
 
@@ -248,7 +245,21 @@ export async function restoreAudit(context: ProductLabAuditContext, auditId: str
     {
       method: "PATCH",
       headers: { Prefer: "return=representation" },
-      body: JSON.stringify({ status: "in-review", archived_at: null, updated_at: now }),
+      body: JSON.stringify({ status: "in-review", archived_at: null, finalized_at: null, updated_at: now }),
+    },
+  );
+  return rows[0] ? toPersistedAudit(rows[0]) : null;
+}
+
+export async function reopenAudit(context: ProductLabAuditContext, auditId: string): Promise<PersistedAudit | null> {
+  assertAuditContext(context);
+  const now = new Date().toISOString();
+  const rows = await request<AuditRow[]>(
+    `/rest/v1/ai_ux_audits?id=${eq(auditId)}&reviewer_id=${eq(context.reviewerId)}&status=eq.finalized`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ status: "in-review", finalized_at: null, archived_at: null, updated_at: now }),
     },
   );
   return rows[0] ? toPersistedAudit(rows[0]) : null;
