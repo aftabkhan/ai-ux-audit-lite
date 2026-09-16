@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getAuditProvider } from "@/lib/ai/provider-factory";
 import { AuditServiceError, toAuditError } from "@/lib/audit/errors";
-import { auditContextSchema, auditResultSchema } from "@/lib/audit/schema";
+import { findingsReferenceSubmittedEvidence } from "@/lib/audit/evidence-refs";
+import { parseAuditContextFromFormData } from "@/lib/audit/request-context";
+import { auditResultSchema } from "@/lib/audit/schema";
 import { checkAuditRateLimit } from "@/lib/security/rate-limit";
 import { ACCEPTED_SCREENSHOT_TYPES, MAX_SCREENSHOT_BYTES } from "@/lib/validation/file";
 
@@ -85,18 +87,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const parsedContext = auditContextSchema.safeParse({
-      screenTitle: optionalText(formData.get("screenTitle")),
-      productContext: optionalText(formData.get("productContext")),
-      targetUser: optionalText(formData.get("targetUser")),
-    });
-
-    if (!parsedContext.success) {
+    const parsedContext = parseAuditContextFromFormData(formData);
+    if (!parsedContext) {
       throw new AuditServiceError(
         "INVALID_REQUEST",
-        "The supplied screen context is invalid.",
+        "The supplied audit definition is invalid.",
         400,
-        "Shorten the context fields and submit the audit again.",
+        "Shorten or correct the audit-definition fields and submit the audit again.",
       );
     }
 
@@ -110,13 +107,13 @@ export async function POST(request: Request) {
       })),
     );
 
-    const rawResult = await provider.review({ images, context: parsedContext.data });
+    const rawResult = await provider.review({ images, context: parsedContext });
 
     const result = auditResultSchema.safeParse(rawResult);
-    if (!result.success) {
+    if (!result.success || !findingsReferenceSubmittedEvidence(result.success ? result.data.findings : [], screenshots.length)) {
       throw new AuditServiceError(
         "INVALID_RESPONSE",
-        "The audit provider returned an invalid response.",
+        "The audit provider returned an invalid or ungrounded response.",
         502,
         "Retry the audit. If the problem continues, review the provider configuration.",
       );
@@ -136,12 +133,6 @@ export async function POST(request: Request) {
       headers: { "Cache-Control": "no-store" },
     });
   }
-}
-
-function optionalText(value: FormDataEntryValue | null): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 function getClientIdentifier(request: Request): string {
