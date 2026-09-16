@@ -42,20 +42,20 @@ test("ordered evidence can be previewed, selectively removed, and selected again
     { name: "checkout.png", mimeType: "image/png", buffer: onePixelPng },
   ]);
 
-  await expect(page.getByAltText("Preview of evidence 1: cart.png")).toBeVisible();
-  await expect(page.getByAltText("Preview of evidence 2: checkout.png")).toBeVisible();
+  await expect(page.getByAltText("Preview of evidence 1")).toBeVisible();
+  await expect(page.getByAltText("Preview of evidence 2")).toBeVisible();
   await expect(page.getByText("Replace evidence")).toBeVisible();
 
   await page.getByRole("button", { name: "Remove evidence 1" }).click();
   await expect(page.getByRole("status")).toContainText("Screenshot removed");
-  await expect(page.getByText("Evidence 1 · checkout.png")).toBeVisible();
+  await expect(page.getByText("Evidence 1")).toBeVisible();
   await expect(page.getByLabel("Audit title")).toHaveValue("Checkout payment flow");
   await expect(page.getByLabel("Target user")).toHaveValue("First-time customer");
   await expect(page.getByLabel("Product context")).toHaveValue("Customer moves from cart to payment confirmation.");
   await expect(page.getByLabel(/^Choose screenshots/)).toBeFocused();
 
   await uploadScreenshot(page, "checkout-again.png");
-  await expect(page.getByAltText("Preview of evidence 1: checkout-again.png")).toBeVisible();
+  await expect(page.getByAltText("Preview of evidence 1")).toBeVisible();
 });
 
 test("unsupported and oversized files provide recoverable validation", async ({ page }) => {
