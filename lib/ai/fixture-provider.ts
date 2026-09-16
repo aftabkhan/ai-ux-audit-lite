@@ -38,7 +38,7 @@ export class FixtureAuditProvider implements AuditProvider {
           id: "fixture-accessibility",
           title: "Complete an accessibility review",
           severity: "high",
-          category: "accessibility-basics",
+          category: "accessibility",
           observation: "Automated fixture mode cannot validate contrast, focus order, semantics, or assistive-technology behavior.",
           impact: "Accessibility barriers may prevent people from understanding or completing the task.",
           recommendation: "Run keyboard, screen-reader, zoom, and contrast checks with the implemented interface.",
