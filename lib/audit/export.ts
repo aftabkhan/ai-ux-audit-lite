@@ -6,9 +6,13 @@ export function auditToMarkdown(
   triageSummary?: AuditTriageSummary,
 ): string {
   const contextLines = [
-    result.context.screenTitle ? `- Screen: ${result.context.screenTitle}` : null,
+    result.context.screenTitle ? `- Audit title: ${result.context.screenTitle}` : null,
+    result.context.scopeType ? `- Scope: ${formatContextValue(result.context.scopeType)}` : null,
     result.context.targetUser ? `- Target user: ${result.context.targetUser}` : null,
-    result.context.productContext ? `- Context: ${result.context.productContext}` : null,
+    result.context.taskDescription ? `- Task: ${result.context.taskDescription}` : null,
+    result.context.businessObjective ? `- Business objective: ${result.context.businessObjective}` : null,
+    result.context.expectedOutcome ? `- Expected outcome: ${result.context.expectedOutcome}` : null,
+    result.context.productContext ? `- Product context: ${result.context.productContext}` : null,
   ].filter(Boolean);
 
   let hitlSection: string | null = null;
@@ -60,10 +64,13 @@ export function auditToMarkdown(
         }`,
         `- Category: ${finding.category}`,
         `- Confidence: ${finding.confidence}`,
+        finding.evidenceRefs?.length
+          ? `- Evidence: ${finding.evidenceRefs.map((ref) => `Evidence ${ref}`).join(", ")}`
+          : null,
         ...(itemTriage?.reviewerNote?.trim()
           ? [`- Reviewer Note: ${itemTriage.reviewerNote.trim()}`]
           : []),
-      ];
+      ].filter((line): line is string => line !== null);
 
       return (
         `### ${index + 1}. ${finding.title}${isDismissed ? " [DISMISSED]" : ""}\n\n` +
@@ -80,7 +87,7 @@ export function auditToMarkdown(
     "",
     `Generated: ${new Date(result.generatedAt).toLocaleString()}`,
     "",
-    contextLines.length ? "## Context\n\n" + contextLines.join("\n") : null,
+    contextLines.length ? "## Audit Definition\n\n" + contextLines.join("\n") : null,
     hitlSection,
     "",
     "## Summary",
@@ -139,6 +146,13 @@ export function downloadAuditMarkdown(
     type: "text/markdown;charset=utf-8",
   });
   downloadBlob(blob, "ai-ux-audit-report.md");
+}
+
+function formatContextValue(value: string): string {
+  return value
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function downloadBlob(blob: Blob, fileName: string): void {

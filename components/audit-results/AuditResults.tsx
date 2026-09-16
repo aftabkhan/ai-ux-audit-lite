@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { EvidenceRefs } from "@/components/audit-results/EvidenceRefs";
 import { auditToMarkdown, downloadAuditJson, downloadAuditMarkdown } from "@/lib/audit/export";
 import { createAuditScorecard, describeScore } from "@/lib/audit/score";
 import type {
@@ -473,6 +474,7 @@ export function AuditResults({ result, onReset }: AuditResultsProps) {
                           {isAccepted && <span className="accepted-badge">Accepted</span>}
                           {isUnreviewed && <span className="unreviewed-badge">Unreviewed</span>}
                           <span className="category-badge">{formatLabel(finding.category)}</span>
+                          <EvidenceRefs findingId={finding.id} refs={finding.evidenceRefs} />
                         </span>
                         <span className="confidence-label">{finding.confidence} confidence</span>
                       </span>

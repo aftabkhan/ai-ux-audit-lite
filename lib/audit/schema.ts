@@ -1,23 +1,27 @@
 import { z } from "zod";
+import {
+  AUDIT_CATEGORIES,
+  LEGACY_AUDIT_CATEGORIES,
+} from "@/src/types/audit";
+import { AUDIT_SCOPE_TYPES } from "@/src/types/audit-lifecycle";
 
 export const auditCategorySchema = z.enum([
-  "visual-hierarchy",
-  "navigation-orientation",
-  "clarity-of-actions",
-  "consistency",
-  "readability",
-  "feedback-system-status",
-  "error-prevention-recovery",
-  "accessibility-basics",
+  ...AUDIT_CATEGORIES,
+  ...LEGACY_AUDIT_CATEGORIES,
 ]);
 
 export const severitySchema = z.enum(["critical", "high", "medium", "low"]);
 export const confidenceSchema = z.enum(["high", "medium", "low"]);
+export const auditScopeTypeSchema = z.enum(AUDIT_SCOPE_TYPES);
 
 export const auditContextSchema = z.object({
-  screenTitle: z.string().trim().max(100).optional(),
-  productContext: z.string().trim().max(600).optional(),
-  targetUser: z.string().trim().max(120).optional(),
+  screenTitle: z.string().trim().max(160).optional(),
+  scopeType: auditScopeTypeSchema.optional(),
+  productContext: z.string().trim().max(2000).optional(),
+  targetUser: z.string().trim().max(240).optional(),
+  taskDescription: z.string().trim().max(1200).optional(),
+  businessObjective: z.string().trim().max(1200).optional(),
+  expectedOutcome: z.string().trim().max(1200).optional(),
 });
 
 export const auditFindingSchema = z.object({
@@ -29,6 +33,7 @@ export const auditFindingSchema = z.object({
   impact: z.string().min(1),
   recommendation: z.string().min(1),
   confidence: confidenceSchema,
+  evidenceRefs: z.array(z.number().int().min(1).max(8)).min(1).max(8).optional(),
 });
 
 export const auditResultSchema = z.object({

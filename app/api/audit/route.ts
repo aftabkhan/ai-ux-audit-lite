@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { getAuditProvider } from "@/lib/ai/provider-factory";
 import { AuditServiceError, toAuditError } from "@/lib/audit/errors";
-import { auditContextSchema, auditResultSchema } from "@/lib/audit/schema";
+import { findingsReferenceSubmittedEvidence } from "@/lib/audit/evidence-refs";
+import { parseAuditContextFromFormData } from "@/lib/audit/request-context";
+import { auditResultSchema } from "@/lib/audit/schema";
 import { getProductLabIdentity, productLabProtectionEnabled } from "@/lib/product-lab/auth";
 import { checkAuditRateLimit } from "@/lib/security/rate-limit";
 import { ACCEPTED_SCREENSHOT_TYPES, MAX_SCREENSHOT_BYTES } from "@/lib/validation/file";
 
 export const runtime = "nodejs";
+
+const MAX_SCREENSHOTS_PER_AUDIT = 8;
+const MAX_COMBINED_SCREENSHOT_BYTES = 20 * 1024 * 1024;
 
 export async function POST(request: Request) {
   try {
@@ -48,66 +53,85 @@ export async function POST(request: Request) {
     }
 
     const formData = await request.formData();
-    const screenshot = formData.get("screenshot");
+    const screenshots = formData.getAll("screenshot").filter((value): value is File => value instanceof File);
 
-    if (!(screenshot instanceof File)) {
+    if (screenshots.length === 0) {
       throw new AuditServiceError(
         "INVALID_REQUEST",
-        "A screenshot is required.",
+        "At least one screenshot is required.",
         400,
-        "Choose one PNG, JPEG, or WebP screenshot and submit the form again.",
+        "Choose one or more PNG, JPEG, or WebP screenshots and submit the audit again.",
       );
     }
 
-    if (!ACCEPTED_SCREENSHOT_TYPES.includes(screenshot.type as (typeof ACCEPTED_SCREENSHOT_TYPES)[number])) {
+    if (screenshots.length > MAX_SCREENSHOTS_PER_AUDIT) {
       throw new AuditServiceError(
-        "INVALID_FILE",
-        "The screenshot format is not supported.",
-        415,
-        "Use a PNG, JPEG, or WebP image.",
+        "INVALID_REQUEST",
+        `A maximum of ${MAX_SCREENSHOTS_PER_AUDIT} screenshots can be analyzed in one audit.`,
+        400,
+        "Remove extra screenshots and submit the audit again.",
       );
     }
 
-    if (screenshot.size > MAX_SCREENSHOT_BYTES) {
+    let combinedBytes = 0;
+    for (const screenshot of screenshots) {
+      if (!ACCEPTED_SCREENSHOT_TYPES.includes(screenshot.type as (typeof ACCEPTED_SCREENSHOT_TYPES)[number])) {
+        throw new AuditServiceError(
+          "INVALID_FILE",
+          "One or more screenshot formats are not supported.",
+          415,
+          "Use only PNG, JPEG, or WebP images.",
+        );
+      }
+
+      if (screenshot.size > MAX_SCREENSHOT_BYTES) {
+        throw new AuditServiceError(
+          "FILE_TOO_LARGE",
+          "One or more screenshots are larger than 5 MB.",
+          413,
+          "Compress the image or choose a smaller screenshot.",
+        );
+      }
+
+      combinedBytes += screenshot.size;
+    }
+
+    if (combinedBytes > MAX_COMBINED_SCREENSHOT_BYTES) {
       throw new AuditServiceError(
         "FILE_TOO_LARGE",
-        "The screenshot is larger than 5 MB.",
+        "The combined screenshot evidence is larger than 20 MB.",
         413,
-        "Compress the image or choose a smaller screenshot.",
+        "Compress or remove screenshots and submit the audit again.",
       );
     }
 
-    const parsedContext = auditContextSchema.safeParse({
-      screenTitle: optionalText(formData.get("screenTitle")),
-      productContext: optionalText(formData.get("productContext")),
-      targetUser: optionalText(formData.get("targetUser")),
-    });
-
-    if (!parsedContext.success) {
+    const parsedContext = parseAuditContextFromFormData(formData);
+    if (!parsedContext) {
       throw new AuditServiceError(
         "INVALID_REQUEST",
-        "The supplied screen context is invalid.",
+        "The supplied audit definition is invalid.",
         400,
-        "Shorten the context fields and submit the audit again.",
+        "Shorten or correct the audit-definition fields and submit the audit again.",
       );
     }
 
     const provider = getAuditProvider();
-    const bytes = new Uint8Array(await screenshot.arrayBuffer());
-    const rawResult = await provider.review({
-      image: {
-        bytes,
+    const images = await Promise.all(
+      screenshots.map(async (screenshot, sequenceIndex) => ({
+        bytes: new Uint8Array(await screenshot.arrayBuffer()),
         mimeType: screenshot.type as "image/png" | "image/jpeg" | "image/webp",
         fileName: screenshot.name,
-      },
-      context: parsedContext.data,
-    });
+        sequenceIndex,
+      })),
+    );
+
+    const rawResult = await provider.review({ images, context: parsedContext });
 
     const result = auditResultSchema.safeParse(rawResult);
-    if (!result.success) {
+    if (!result.success || !findingsReferenceSubmittedEvidence(result.success ? result.data.findings : [], screenshots.length)) {
       throw new AuditServiceError(
         "INVALID_RESPONSE",
-        "The audit provider returned an invalid response.",
+        "The audit provider returned an invalid or ungrounded response.",
         502,
         "Retry the audit. If the problem continues, review the provider configuration.",
       );
@@ -127,12 +151,6 @@ export async function POST(request: Request) {
       headers: { "Cache-Control": "no-store" },
     });
   }
-}
-
-function optionalText(value: FormDataEntryValue | null): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 function getClientIdentifier(request: Request): string {

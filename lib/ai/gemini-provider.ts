@@ -1,5 +1,5 @@
 import type { AuditProvider, AuditProviderInput } from "@/lib/ai/provider";
-import { buildAuditPrompt } from "@/lib/ai/audit-prompt";
+import { buildAuditContextMessage, buildAuditInstructions } from "@/lib/ai/audit-prompt";
 import { AuditServiceError } from "@/lib/audit/errors";
 import { auditResultSchema } from "@/lib/audit/schema";
 import type { AuditResult } from "@/src/types/audit";
@@ -33,41 +33,66 @@ export class GeminiAuditProvider implements AuditProvider {
       );
     }
 
+    if (input.images.length === 0) {
+      throw new AuditServiceError("INVALID_REQUEST", "At least one screenshot is required.", 400);
+    }
+
     const model = process.env.GEMINI_AUDIT_MODEL ?? "gemini-3.6-flash";
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { text: buildAuditPrompt(input.context) },
-              {
-                inlineData: {
-                  mimeType: input.image.mimeType,
-                  data: Buffer.from(input.image.bytes).toString("base64"),
-                },
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0.2,
+    const evidenceParts = input.images.flatMap((image, index) => [
+      { text: `Evidence ${index + 1} of ${input.images.length}: ${safeEvidenceLabel(image.fileName)}` },
+      {
+        inlineData: {
+          mimeType: image.mimeType,
+          data: Buffer.from(image.bytes).toString("base64"),
         },
-      }),
-      signal: AbortSignal.timeout(60_000),
-    });
+      },
+    ]);
+
+    let response: Response;
+    try {
+      response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: buildAuditInstructions(input.images.length) }],
+          },
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: buildAuditContextMessage(input.context) }, ...evidenceParts],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.2,
+          },
+        }),
+        signal: AbortSignal.timeout(60_000),
+      });
+    } catch (error) {
+      if (isTimeoutError(error)) {
+        throw new AuditServiceError(
+          "PROVIDER_TIMEOUT",
+          "The AI provider took too long to complete the audit.",
+          504,
+          "Your inputs are still available. Retry the audit in a moment.",
+        );
+      }
+      throw new AuditServiceError(
+        "PROVIDER_ERROR",
+        "The AI provider could not be reached.",
+        502,
+        "Check your connection and retry the audit.",
+      );
+    }
 
     if (!response.ok) {
-      const detail = await response.text();
-      console.error("Gemini audit request failed", response.status, detail.slice(0, 500));
+      console.error("Gemini audit request failed", { status: response.status });
       throw new AuditServiceError(
         "PROVIDER_ERROR",
         "The AI provider could not complete the screenshot review.",
@@ -89,12 +114,12 @@ export class GeminiAuditProvider implements AuditProvider {
       },
       findings: parsed.findings,
       disclaimer:
-        "AI-generated first-pass UX review based on one screenshot and the context provided. Validate findings through user research, accessibility testing, analytics, and expert review before making product decisions.",
+        "AI-generated first-pass UX review based on the supplied screenshot evidence and context. Validate findings through user research, accessibility testing, analytics, and expert review before making product decisions.",
     };
 
     const validated = auditResultSchema.safeParse(result);
     if (!validated.success) {
-      console.error("Gemini audit response failed validation", validated.error.flatten());
+      console.error("Gemini audit response failed validation", { issueCount: validated.error.issues.length });
       throw new AuditServiceError(
         "INVALID_RESPONSE",
         "The AI provider returned an incomplete audit report.",
@@ -105,6 +130,14 @@ export class GeminiAuditProvider implements AuditProvider {
 
     return validated.data;
   }
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError");
+}
+
+function safeEvidenceLabel(fileName: string): string {
+  return fileName.replace(/[\r\n\t]/g, " ").slice(0, 120) || "screenshot";
 }
 
 function extractOutputText(response: GeminiResponse): string {

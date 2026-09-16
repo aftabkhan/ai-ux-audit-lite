@@ -1,0 +1,44 @@
+name: Showcase Sync Main
+
+on:
+  push:
+    branches:
+      - phase-2/reliability-recovery-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  sync-main:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out showcase branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: phase-2/reliability-recovery-hardening
+          fetch-depth: 0
+
+      - name: Merge current main and resolve known route conflict
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          if git merge origin/main --no-edit; then
+            git push origin HEAD:phase-2/reliability-recovery-hardening
+            exit 0
+          fi
+
+          conflicts="$(git diff --name-only --diff-filter=U)"
+          if [ "$conflicts" != "app/api/audit/route.ts" ]; then
+            echo "Unexpected merge conflicts:"
+            printf '%s\n' "$conflicts"
+            exit 1
+          fi
+
+          # The feature-branch route already combines Product Lab access enforcement
+          # from main with the new multi-evidence/grounding implementation.
+          git checkout --ours app/api/audit/route.ts
+          git add app/api/audit/route.ts
+          git commit --no-edit
+          git push origin HEAD:phase-2/reliability-recovery-hardening

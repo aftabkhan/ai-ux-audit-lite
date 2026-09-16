@@ -1,15 +1,16 @@
-export const AUDIT_CATEGORIES = [
-  "visual-hierarchy",
+import { AUDIT_DIMENSIONS, AUDIT_SCOPE_TYPES } from "@/src/types/audit-lifecycle";
+
+export const AUDIT_CATEGORIES = AUDIT_DIMENSIONS;
+export type CanonicalAuditCategory = (typeof AUDIT_CATEGORIES)[number];
+
+export const LEGACY_AUDIT_CATEGORIES = [
   "navigation-orientation",
   "clarity-of-actions",
-  "consistency",
   "readability",
-  "feedback-system-status",
-  "error-prevention-recovery",
   "accessibility-basics",
 ] as const;
-
-export type AuditCategory = (typeof AUDIT_CATEGORIES)[number];
+export type LegacyAuditCategory = (typeof LEGACY_AUDIT_CATEGORIES)[number];
+export type AuditCategory = CanonicalAuditCategory | LegacyAuditCategory;
 
 export const FINDING_SEVERITIES = ["critical", "high", "medium", "low"] as const;
 export type FindingSeverity = (typeof FINDING_SEVERITIES)[number];
@@ -42,10 +43,16 @@ export interface AuditTriageSummary {
 export const CONFIDENCE_LEVELS = ["high", "medium", "low"] as const;
 export type ConfidenceLevel = (typeof CONFIDENCE_LEVELS)[number];
 
+export type AuditScopeType = (typeof AUDIT_SCOPE_TYPES)[number];
+
 export interface AuditContext {
   screenTitle?: string;
+  scopeType?: AuditScopeType;
   productContext?: string;
   targetUser?: string;
+  taskDescription?: string;
+  businessObjective?: string;
+  expectedOutcome?: string;
 }
 
 export interface AuditFinding {
@@ -57,6 +64,7 @@ export interface AuditFinding {
   impact: string;
   recommendation: string;
   confidence: ConfidenceLevel;
+  evidenceRefs?: number[];
 }
 
 export interface AuditSummary {
@@ -80,6 +88,7 @@ export interface AuditError {
   | "FILE_TOO_LARGE"
   | "INVALID_REQUEST"
   | "RATE_LIMITED"
+  | "PROVIDER_TIMEOUT"
   | "PROVIDER_ERROR"
   | "INVALID_RESPONSE"
   | "UNKNOWN_ERROR";

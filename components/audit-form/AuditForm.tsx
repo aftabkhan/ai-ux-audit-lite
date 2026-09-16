@@ -1,25 +1,41 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useId, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useId, useRef, useState } from "react";
 import { AuditResults } from "@/components/audit-results/AuditResults";
 import { validateScreenshot } from "@/lib/validation/file";
-import type { AuditError, AuditResult } from "@/src/types/audit";
+import type { AuditError, AuditResult, AuditScopeType } from "@/src/types/audit";
 
 interface FormState {
   screenTitle: string;
+  scopeType: AuditScopeType;
   productContext: string;
   targetUser: string;
+  taskDescription: string;
+  businessObjective: string;
+  expectedOutcome: string;
+}
+
+interface EvidencePreview {
+  file: File;
+  url: string;
 }
 
 const initialFormState: FormState = {
   screenTitle: "",
+  scopeType: "single-screen",
   productContext: "",
   targetUser: "",
+  taskDescription: "",
+  businessObjective: "",
+  expectedOutcome: "",
 };
 
+const MAX_SCREENSHOTS = 8;
+const MAX_COMBINED_BYTES = 20 * 1024 * 1024;
+
 const progressMessages = [
-  "Preparing the screenshot…",
-  "Reading the visible interface…",
+  "Preparing the evidence…",
+  "Reading the visible interfaces…",
   "Evaluating hierarchy and actions…",
   "Reviewing clarity and accessibility…",
   "Prioritizing recommendations…",
@@ -29,8 +45,8 @@ const progressMessages = [
 export function AuditForm() {
   const fileInputId = useId();
   const [form, setForm] = useState<FormState>(initialFormState);
-  const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [evidence, setEvidence] = useState<EvidencePreview[]>([]);
+  const previewUrlsRef = useRef<string[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
   const [status, setStatus] = useState<string>("");
   const [progressIndex, setProgressIndex] = useState(0);
@@ -40,22 +56,27 @@ export function AuditForm() {
 
   useEffect(() => {
     return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [previewUrl]);
+  }, []);
 
-  function clearPreview() {
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(null);
-    }
+  function clearEvidence() {
+    previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    previewUrlsRef.current = [];
+    setEvidence([]);
   }
 
-  function removeScreenshot() {
-    clearPreview();
-    setFile(null);
+  function removeScreenshot(index: number) {
+    setEvidence((current) => {
+      const item = current[index];
+      if (item) {
+        URL.revokeObjectURL(item.url);
+        previewUrlsRef.current = previewUrlsRef.current.filter((url) => url !== item.url);
+      }
+      return current.filter((_, itemIndex) => itemIndex !== index);
+    });
     setFileError(null);
-    setStatus("Screenshot removed. Choose another screenshot when you are ready.");
+    setStatus("Screenshot removed. Remaining evidence is still ready to review.");
     setResult(null);
     setInputKey((current) => current + 1);
     requestAnimationFrame(() => {
@@ -64,39 +85,51 @@ export function AuditForm() {
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const selectedFile = event.target.files?.[0] ?? null;
+    const selectedFiles = Array.from(event.target.files ?? []);
     setStatus("");
     setResult(null);
-    clearPreview();
 
-    if (!selectedFile) {
-      setFile(null);
-      setFileError(null);
-      return;
-    }
+    if (selectedFiles.length === 0) return;
 
-    const validation = validateScreenshot(selectedFile);
-    if (!validation.valid) {
-      setFile(null);
-      setFileError(validation.message);
+    if (selectedFiles.length > MAX_SCREENSHOTS) {
+      setFileError(`Choose no more than ${MAX_SCREENSHOTS} screenshots for one audit.`);
       event.target.value = "";
       return;
     }
 
-    setFile(selectedFile);
-    setPreviewUrl(URL.createObjectURL(selectedFile));
+    let combinedBytes = 0;
+    for (const selectedFile of selectedFiles) {
+      const validation = validateScreenshot(selectedFile);
+      if (!validation.valid) {
+        setFileError(validation.message);
+        event.target.value = "";
+        return;
+      }
+      combinedBytes += selectedFile.size;
+    }
+
+    if (combinedBytes > MAX_COMBINED_BYTES) {
+      setFileError("The selected screenshots exceed 20 MB combined. Compress or remove evidence and try again.");
+      event.target.value = "";
+      return;
+    }
+
+    clearEvidence();
+    const nextEvidence = selectedFiles.map((file) => ({ file, url: URL.createObjectURL(file) }));
+    previewUrlsRef.current = nextEvidence.map((item) => item.url);
+    setEvidence(nextEvidence);
     setFileError(null);
   }
 
-  function updateField(field: keyof FormState, value: string) {
+  function updateField<K extends keyof FormState>(field: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!file) {
-      setFileError("Add a screenshot before starting the audit.");
+    if (evidence.length === 0) {
+      setFileError("Add at least one screenshot before starting the audit.");
       document.getElementById(fileInputId)?.focus();
       return;
     }
@@ -111,9 +144,13 @@ export function AuditForm() {
     }, 1800);
 
     const body = new FormData();
-    body.set("screenshot", file);
+    evidence.forEach(({ file }) => body.append("screenshot", file));
     body.set("screenTitle", form.screenTitle);
+    body.set("scopeType", form.scopeType);
     body.set("targetUser", form.targetUser);
+    body.set("taskDescription", form.taskDescription);
+    body.set("businessObjective", form.businessObjective);
+    body.set("expectedOutcome", form.expectedOutcome);
     body.set("productContext", form.productContext);
 
     try {
@@ -142,9 +179,8 @@ export function AuditForm() {
   }
 
   function resetAudit() {
-    clearPreview();
+    clearEvidence();
     setForm(initialFormState);
-    setFile(null);
     setFileError(null);
     setStatus("");
     setResult(null);
@@ -162,13 +198,13 @@ export function AuditForm() {
         <section className="form-section" aria-labelledby="screenshot-heading">
           <div className="section-heading">
             <span className="step-label">Step 1</span>
-            <h2 id="screenshot-heading">Upload an interface screenshot</h2>
-            <p>Use a PNG, JPEG, or WebP image up to 5 MB. Avoid confidential or personal information.</p>
+            <h2 id="screenshot-heading">Add interface evidence</h2>
+            <p>Choose 1–8 ordered PNG, JPEG, or WebP screenshots. Each image can be up to 5 MB, with a 20 MB combined limit. Avoid confidential or personal information.</p>
           </div>
 
           <label className="upload-control" htmlFor={fileInputId}>
-            <span className="upload-title">{file ? "Replace screenshot" : "Choose screenshot"}</span>
-            <span className="upload-help">PNG, JPEG, or WebP · Maximum 5 MB</span>
+            <span className="upload-title">{evidence.length ? "Replace evidence" : "Choose screenshots"}</span>
+            <span className="upload-help">1–8 screenshots · PNG, JPEG, or WebP · 5 MB each</span>
           </label>
           <input
             key={inputKey}
@@ -176,7 +212,9 @@ export function AuditForm() {
             id={fileInputId}
             type="file"
             accept="image/png,image/jpeg,image/webp"
+            multiple
             onChange={handleFileChange}
+            aria-label="Choose screenshots, 1 to 8 images"
             aria-describedby={fileError ? `${fileInputId}-error` : undefined}
             aria-invalid={Boolean(fileError)}
             disabled={isSubmitting}
@@ -184,50 +222,78 @@ export function AuditForm() {
 
           {fileError ? <p className="field-error" id={`${fileInputId}-error`} role="alert">{fileError}</p> : null}
 
-          {previewUrl && file ? (
-            <figure className="preview-card">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={previewUrl} alt={`Preview of ${file.name}`} />
-              <figcaption>
-                <div>
-                  <strong>{file.name}</strong>
-                  <span>{Math.ceil(file.size / 1024)} KB · Ready to review</span>
-                </div>
-                <button className="secondary-button" type="button" onClick={removeScreenshot} disabled={isSubmitting}>
-                  Remove screenshot
-                </button>
-              </figcaption>
-            </figure>
+          {evidence.length ? (
+            <div className="evidence-list" aria-label="Selected screenshot evidence">
+              {evidence.map(({ file, url }, index) => (
+                <figure className="preview-card" key={`${file.name}-${file.size}-${index}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt={`Preview of evidence ${index + 1}`} />
+                  <figcaption>
+                    <div>
+                      <strong>Evidence {index + 1}</strong>
+                      <span>{Math.ceil(file.size / 1024)} KB · Ready to review</span>
+                    </div>
+                    <button className="secondary-button" type="button" onClick={() => removeScreenshot(index)} disabled={isSubmitting}>
+                      Remove evidence {index + 1}
+                    </button>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
           ) : null}
         </section>
 
         <section className="form-section" aria-labelledby="context-heading">
           <div className="section-heading">
             <span className="step-label">Step 2</span>
-            <h2 id="context-heading">Add context</h2>
-            <p>Context helps the review stay relevant to the screen, product, and intended audience.</p>
+            <h2 id="context-heading">Define the audit</h2>
+            <p>Describe the scope, user task and intended outcome so findings stay grounded in the evidence and real product context.</p>
           </div>
 
           <div className="field-grid">
             <label>
-              <span>Screen title</span>
-              <input type="text" value={form.screenTitle} onChange={(event) => updateField("screenTitle", event.target.value)} maxLength={100} placeholder="Example: Checkout payment step" disabled={isSubmitting} />
+              <span>Audit title</span>
+              <input type="text" value={form.screenTitle} onChange={(event) => updateField("screenTitle", event.target.value)} maxLength={160} placeholder="Example: Mobile checkout flow" disabled={isSubmitting} />
+            </label>
+            <label>
+              <span>Audit scope</span>
+              <select value={form.scopeType} onChange={(event) => updateField("scopeType", event.target.value as AuditScopeType)} disabled={isSubmitting}>
+                <option value="single-screen">Single screen</option>
+                <option value="multi-screen">Multiple screens</option>
+                <option value="user-flow">User flow</option>
+                <option value="page-sequence">Website / page sequence</option>
+                <option value="product-workflow">Product workflow</option>
+              </select>
             </label>
             <label>
               <span>Target user</span>
-              <input type="text" value={form.targetUser} onChange={(event) => updateField("targetUser", event.target.value)} maxLength={120} placeholder="Example: First-time mobile customer" disabled={isSubmitting} />
+              <input type="text" value={form.targetUser} onChange={(event) => updateField("targetUser", event.target.value)} maxLength={240} placeholder="Example: First-time mobile customer" disabled={isSubmitting} />
+            </label>
+            <label>
+              <span>Expected user outcome</span>
+              <input type="text" value={form.expectedOutcome} onChange={(event) => updateField("expectedOutcome", event.target.value)} maxLength={1200} placeholder="Example: Complete payment confidently" disabled={isSubmitting} />
+            </label>
+            <label className="full-width">
+              <span>Task description</span>
+              <textarea value={form.taskDescription} onChange={(event) => updateField("taskDescription", event.target.value)} maxLength={1200} rows={3} placeholder="Describe the task the user is trying to complete across the supplied evidence." disabled={isSubmitting} />
+              <small>{form.taskDescription.length}/1200 characters</small>
+            </label>
+            <label className="full-width">
+              <span>Business objective</span>
+              <textarea value={form.businessObjective} onChange={(event) => updateField("businessObjective", event.target.value)} maxLength={1200} rows={3} placeholder="Example: Reduce checkout abandonment while preserving trust." disabled={isSubmitting} />
+              <small>{form.businessObjective.length}/1200 characters</small>
             </label>
             <label className="full-width">
               <span>Product context</span>
-              <textarea value={form.productContext} onChange={(event) => updateField("productContext", event.target.value)} maxLength={600} rows={5} placeholder="Describe the user goal, business context, or known constraints." disabled={isSubmitting} />
-              <small>{form.productContext.length}/600 characters</small>
+              <textarea value={form.productContext} onChange={(event) => updateField("productContext", event.target.value)} maxLength={2000} rows={4} placeholder="Add product, device, known constraints, or other context visible evidence cannot provide." disabled={isSubmitting} />
+              <small>{form.productContext.length}/2000 characters</small>
             </label>
           </div>
         </section>
 
         <div className="form-actions">
-          <button type="submit" disabled={isSubmitting}>{isSubmitting ? "Analyzing screenshot…" : result ? "Run another audit" : "Run UX audit"}</button>
-          <p className="privacy-note">Screenshots are processed for this request and are not saved by this application.</p>
+          <button type="submit" disabled={isSubmitting}>{isSubmitting ? "Analyzing evidence…" : result ? "Run another audit" : "Run UX audit"}</button>
+          <p className="privacy-note">Evidence is processed for this request and is not persisted by the current public workflow. Product Lab persistence will use reviewer-owned private storage only after its auth boundary is active.</p>
         </div>
 
         <div className="status-message" role="status" aria-live="polite" aria-atomic="true">
@@ -236,7 +302,7 @@ export function AuditForm() {
               <span className="audit-progress-spinner" aria-hidden="true" />
               <div>
                 <strong>{progressMessages[progressIndex]}</strong>
-                <span>AI is preparing a screenshot-specific first-pass review.</span>
+                <span>AI is preparing an evidence-grounded first-pass review.</span>
               </div>
             </div>
           ) : status ? <p>{status}</p> : null}

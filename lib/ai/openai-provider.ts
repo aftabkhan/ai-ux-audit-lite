@@ -1,5 +1,5 @@
 import type { AuditProvider, AuditProviderInput } from "@/lib/ai/provider";
-import { buildAuditPrompt } from "@/lib/ai/audit-prompt";
+import { buildAuditContextMessage, buildAuditInstructions } from "@/lib/ai/audit-prompt";
 import { AuditServiceError } from "@/lib/audit/errors";
 import { auditResultSchema } from "@/lib/audit/schema";
 import type { AuditResult } from "@/src/types/audit";
@@ -32,34 +32,66 @@ export class OpenAIAuditProvider implements AuditProvider {
       );
     }
 
-    const model = process.env.OPENAI_AUDIT_MODEL ?? "gpt-5";
-    const imageUrl = `data:${input.image.mimeType};base64,${Buffer.from(input.image.bytes).toString("base64")}`;
+    if (input.images.length === 0) {
+      throw new AuditServiceError("INVALID_REQUEST", "At least one screenshot is required.", 400);
+    }
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+    const model = process.env.OPENAI_AUDIT_MODEL ?? "gpt-5";
+    const evidenceContent = input.images.flatMap((image, index) => [
+      {
+        type: "input_text",
+        text: `Evidence ${index + 1} of ${input.images.length}: ${safeEvidenceLabel(image.fileName)}`,
       },
-      body: JSON.stringify({
-        model,
-        store: false,
-        input: [
-          {
-            role: "user",
-            content: [
-              { type: "input_text", text: buildAuditPrompt(input.context) },
-              { type: "input_image", image_url: imageUrl, detail: "high" },
-            ],
-          },
-        ],
-      }),
-      signal: AbortSignal.timeout(60_000),
-    });
+      {
+        type: "input_image",
+        image_url: `data:${image.mimeType};base64,${Buffer.from(image.bytes).toString("base64")}`,
+        detail: "high",
+      },
+    ]);
+
+    let response: Response;
+    try {
+      response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          store: false,
+          instructions: buildAuditInstructions(input.images.length),
+          input: [
+            {
+              role: "user",
+              content: [
+                { type: "input_text", text: buildAuditContextMessage(input.context) },
+                ...evidenceContent,
+              ],
+            },
+          ],
+        }),
+        signal: AbortSignal.timeout(60_000),
+      });
+    } catch (error) {
+      if (isTimeoutError(error)) {
+        throw new AuditServiceError(
+          "PROVIDER_TIMEOUT",
+          "The AI provider took too long to complete the audit.",
+          504,
+          "Your inputs are still available. Retry the audit in a moment.",
+        );
+      }
+      throw new AuditServiceError(
+        "PROVIDER_ERROR",
+        "The AI provider could not be reached.",
+        502,
+        "Check your connection and retry the audit.",
+      );
+    }
 
     if (!response.ok) {
-      const detail = await response.text();
-      console.error("OpenAI audit request failed", response.status, detail.slice(0, 500));
+      console.error("OpenAI audit request failed", { status: response.status });
       throw new AuditServiceError(
         "PROVIDER_ERROR",
         "The AI provider could not complete the screenshot review.",
@@ -83,12 +115,12 @@ export class OpenAIAuditProvider implements AuditProvider {
       },
       findings: parsed.findings,
       disclaimer:
-        "AI-generated first-pass UX review based on one screenshot and the context provided. Validate findings through user research, accessibility testing, analytics, and expert review before making product decisions.",
+        "AI-generated first-pass UX review based on the supplied screenshot evidence and context. Validate findings through user research, accessibility testing, analytics, and expert review before making product decisions.",
     };
 
     const validated = auditResultSchema.safeParse(result);
     if (!validated.success) {
-      console.error("OpenAI audit response failed validation", validated.error.flatten());
+      console.error("OpenAI audit response failed validation", { issueCount: validated.error.issues.length });
       throw new AuditServiceError(
         "INVALID_RESPONSE",
         "The AI provider returned an incomplete audit report.",
@@ -99,6 +131,14 @@ export class OpenAIAuditProvider implements AuditProvider {
 
     return validated.data;
   }
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError");
+}
+
+function safeEvidenceLabel(fileName: string): string {
+  return fileName.replace(/[\r\n\t]/g, " ").slice(0, 120) || "screenshot";
 }
 
 function extractOutputText(response: OpenAIResponse): string {
