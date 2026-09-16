@@ -1,5 +1,5 @@
 import type { AuditProvider, AuditProviderInput } from "@/lib/ai/provider";
-import { buildAuditPrompt } from "@/lib/ai/audit-prompt";
+import { buildAuditContextMessage, buildAuditInstructions } from "@/lib/ai/audit-prompt";
 import { AuditServiceError } from "@/lib/audit/errors";
 import { auditResultSchema } from "@/lib/audit/schema";
 import type { AuditResult } from "@/src/types/audit";
@@ -58,10 +58,13 @@ export class GeminiAuditProvider implements AuditProvider {
           "x-goog-api-key": apiKey,
         },
         body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: buildAuditInstructions(input.images.length) }],
+          },
           contents: [
             {
               role: "user",
-              parts: [{ text: buildAuditPrompt(input.context, input.images.length) }, ...evidenceParts],
+              parts: [{ text: buildAuditContextMessage(input.context) }, ...evidenceParts],
             },
           ],
           generationConfig: {
