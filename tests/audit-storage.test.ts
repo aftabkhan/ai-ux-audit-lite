@@ -9,14 +9,14 @@ import {
 } from "@/lib/audit/storage";
 
 const context = {
-  reviewerId: "11111111-1111-1111-1111-111111111111",
-  sessionId: "22222222-2222-2222-2222-222222222222",
+  reviewerId: "11111111-1111-4111-8111-111111111111",
+  sessionId: "22222222-2222-4222-8222-222222222222",
   productKey: "ai-ux-audit" as const,
   expiresAt: "2099-01-01T00:00:00.000Z",
 };
 
 const row = {
-  id: "33333333-3333-3333-3333-333333333333",
+  id: "33333333-3333-4333-8333-333333333333",
   reviewer_id: context.reviewerId,
   title: "Checkout audit",
   scope_type: "user-flow",
@@ -99,8 +99,8 @@ describe("audit storage", () => {
     expect(JSON.parse(String(init.body))).toMatchObject({ title: "Updated checkout audit" });
   });
 
-  it("persists human review only for a reviewer-owned finding and audit", async () => {
-    const findingId = "44444444-4444-4444-4444-444444444444";
+  it("persists human review through the reviewer-scoped guarded RPC", async () => {
+    const findingId = "44444444-4444-4444-8444-444444444444";
     const reviewRow = {
       finding_id: findingId,
       audit_id: row.id,
@@ -124,10 +124,15 @@ describe("audit storage", () => {
     });
 
     expect(review?.status).toBe("accepted");
-    const [url] = fetchMock.mock.calls[0] as [string];
-    expect(url).toContain("finding_id=eq.");
-    expect(url).toContain("audit_id=eq.");
-    expect(url).toContain("reviewer_id=eq.");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/rpc/update_ai_ux_audit_review");
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      p_finding_id: findingId,
+      p_audit_id: row.id,
+      p_reviewer_id: context.reviewerId,
+      p_status: "accepted",
+      p_severity_override: "high",
+    });
   });
 
   it("rejects an expired or wrong-product context before storage access", async () => {
