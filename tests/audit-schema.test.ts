@@ -39,7 +39,12 @@ describe("audit schemas", () => {
     expect(auditResultSchema.safeParse(invalid).success).toBe(false);
   });
 
-  it("enforces context length limits", () => {
-    expect(auditContextSchema.safeParse({ screenTitle: "x".repeat(101) }).success).toBe(false);
+  it("enforces the expanded audit-definition context limits", () => {
+    expect(auditContextSchema.safeParse({ screenTitle: "x".repeat(161) }).success).toBe(false);
+    expect(auditContextSchema.safeParse({ targetUser: "x".repeat(241) }).success).toBe(false);
+    expect(auditContextSchema.safeParse({ taskDescription: "x".repeat(1201) }).success).toBe(false);
+    expect(auditContextSchema.safeParse({ businessObjective: "x".repeat(1201) }).success).toBe(false);
+    expect(auditContextSchema.safeParse({ expectedOutcome: "x".repeat(1201) }).success).toBe(false);
+    expect(auditContextSchema.safeParse({ productContext: "x".repeat(2001) }).success).toBe(false);
   });
 });
