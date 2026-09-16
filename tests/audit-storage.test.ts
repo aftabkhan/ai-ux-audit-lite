@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { archiveAudit, createAudit, getAudit, listAudits } from "@/lib/audit/storage";
+import {
+  archiveAudit,
+  createAudit,
+  getAudit,
+  listAudits,
+  updateAudit,
+  updateHumanReview,
+} from "@/lib/audit/storage";
 
 const context = {
   reviewerId: "11111111-1111-1111-1111-111111111111",
@@ -74,6 +81,53 @@ describe("audit storage", () => {
     const [url] = fetchMock.mock.calls[0] as [string];
     expect(url).toContain("reviewer_id=eq.");
     expect(url).toContain("status=neq.archived");
+  });
+
+  it("updates only reviewer-owned non-archived audits", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([{ ...row, title: "Updated checkout audit" }]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await updateAudit(context, row.id, { title: "Updated checkout audit" });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("reviewer_id=eq.");
+    expect(url).toContain("status=neq.archived");
+    expect(JSON.parse(String(init.body))).toMatchObject({ title: "Updated checkout audit" });
+  });
+
+  it("persists human review only for a reviewer-owned finding and audit", async () => {
+    const findingId = "44444444-4444-4444-4444-444444444444";
+    const reviewRow = {
+      finding_id: findingId,
+      audit_id: row.id,
+      reviewer_id: context.reviewerId,
+      status: "accepted",
+      severity_override: "high",
+      reviewer_note: "Confirmed in the supplied sequence.",
+      approved_recommendation: null,
+      reviewed_at: "2026-09-16T02:00:00.000Z",
+      updated_at: "2026-09-16T02:00:00.000Z",
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([reviewRow]), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const review = await updateHumanReview(context, row.id, findingId, {
+      status: "accepted",
+      severityOverride: "high",
+      reviewerNote: "Confirmed in the supplied sequence.",
+    });
+
+    expect(review?.status).toBe("accepted");
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain("finding_id=eq.");
+    expect(url).toContain("audit_id=eq.");
+    expect(url).toContain("reviewer_id=eq.");
   });
 
   it("rejects an expired or wrong-product context before storage access", async () => {
