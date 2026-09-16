@@ -1,5 +1,9 @@
 import type { AuditDefinition, PersistedAudit, ProductLabAuditContext } from "@/src/types/audit-lifecycle";
-import { auditDefinitionSchema } from "@/lib/audit/lifecycle-schema";
+import {
+  auditDefinitionSchema,
+  auditDefinitionUpdateSchema,
+  humanReviewUpdateSchema,
+} from "@/lib/audit/lifecycle-schema";
 
 interface AuditRow {
   id: string;
@@ -15,6 +19,30 @@ interface AuditRow {
   archived_at: string | null;
   finalized_at: string | null;
   created_at: string;
+  updated_at: string;
+}
+
+export interface PersistedHumanReview {
+  findingId: string;
+  auditId: string;
+  reviewerId: string;
+  status: "unreviewed" | "accepted" | "dismissed";
+  severityOverride?: "critical" | "high" | "medium" | "low";
+  reviewerNote?: string;
+  approvedRecommendation?: string;
+  reviewedAt?: string;
+  updatedAt: string;
+}
+
+interface ReviewRow {
+  finding_id: string;
+  audit_id: string;
+  reviewer_id: string;
+  status: PersistedHumanReview["status"];
+  severity_override: PersistedHumanReview["severityOverride"] | null;
+  reviewer_note: string | null;
+  approved_recommendation: string | null;
+  reviewed_at: string | null;
   updated_at: string;
 }
 
@@ -79,6 +107,20 @@ function toPersistedAudit(row: AuditRow): PersistedAudit {
   };
 }
 
+function toPersistedReview(row: ReviewRow): PersistedHumanReview {
+  return {
+    findingId: row.finding_id,
+    auditId: row.audit_id,
+    reviewerId: row.reviewer_id,
+    status: row.status,
+    severityOverride: row.severity_override ?? undefined,
+    reviewerNote: row.reviewer_note ?? undefined,
+    approvedRecommendation: row.approved_recommendation ?? undefined,
+    reviewedAt: row.reviewed_at ?? undefined,
+    updatedAt: row.updated_at,
+  };
+}
+
 export async function createAudit(context: ProductLabAuditContext, input: AuditDefinition): Promise<PersistedAudit> {
   assertAuditContext(context);
   const parsed = auditDefinitionSchema.parse(input);
@@ -101,6 +143,34 @@ export async function createAudit(context: ProductLabAuditContext, input: AuditD
   return toPersistedAudit(rows[0]);
 }
 
+export async function updateAudit(
+  context: ProductLabAuditContext,
+  auditId: string,
+  input: Partial<AuditDefinition>,
+): Promise<PersistedAudit | null> {
+  assertAuditContext(context);
+  const parsed = auditDefinitionUpdateSchema.parse(input);
+  const now = new Date().toISOString();
+  const body: Record<string, string | null> = { updated_at: now };
+  if (parsed.title !== undefined) body.title = parsed.title;
+  if (parsed.scopeType !== undefined) body.scope_type = parsed.scopeType;
+  if (parsed.targetUser !== undefined) body.target_user = parsed.targetUser || null;
+  if (parsed.productContext !== undefined) body.product_context = parsed.productContext || null;
+  if (parsed.taskDescription !== undefined) body.task_description = parsed.taskDescription || null;
+  if (parsed.businessObjective !== undefined) body.business_objective = parsed.businessObjective || null;
+  if (parsed.expectedOutcome !== undefined) body.expected_outcome = parsed.expectedOutcome || null;
+
+  const rows = await request<AuditRow[]>(
+    `/rest/v1/ai_ux_audits?id=${eq(auditId)}&reviewer_id=${eq(context.reviewerId)}&status=neq.archived`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(body),
+    },
+  );
+  return rows[0] ? toPersistedAudit(rows[0]) : null;
+}
+
 export async function listAudits(context: ProductLabAuditContext, includeArchived = false): Promise<PersistedAudit[]> {
   assertAuditContext(context);
   const archivedFilter = includeArchived ? "" : "&status=neq.archived";
@@ -116,6 +186,38 @@ export async function getAudit(context: ProductLabAuditContext, auditId: string)
     `/rest/v1/ai_ux_audits?id=${eq(auditId)}&reviewer_id=${eq(context.reviewerId)}&limit=1`,
   );
   return rows[0] ? toPersistedAudit(rows[0]) : null;
+}
+
+export async function updateHumanReview(
+  context: ProductLabAuditContext,
+  auditId: string,
+  findingId: string,
+  input: {
+    status: "unreviewed" | "accepted" | "dismissed";
+    severityOverride?: "critical" | "high" | "medium" | "low" | null;
+    reviewerNote?: string | null;
+    approvedRecommendation?: string | null;
+  },
+): Promise<PersistedHumanReview | null> {
+  assertAuditContext(context);
+  const parsed = humanReviewUpdateSchema.parse(input);
+  const now = new Date().toISOString();
+  const rows = await request<ReviewRow[]>(
+    `/rest/v1/ai_ux_audit_reviews?finding_id=${eq(findingId)}&audit_id=${eq(auditId)}&reviewer_id=${eq(context.reviewerId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        status: parsed.status,
+        severity_override: parsed.severityOverride ?? null,
+        reviewer_note: parsed.reviewerNote ?? null,
+        approved_recommendation: parsed.approvedRecommendation ?? null,
+        reviewed_at: parsed.status === "unreviewed" ? null : now,
+        updated_at: now,
+      }),
+    },
+  );
+  return rows[0] ? toPersistedReview(rows[0]) : null;
 }
 
 export async function archiveAudit(context: ProductLabAuditContext, auditId: string): Promise<PersistedAudit | null> {
