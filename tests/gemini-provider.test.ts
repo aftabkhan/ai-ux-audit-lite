@@ -2,11 +2,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { GeminiAuditProvider } from "@/lib/ai/gemini-provider";
 
 const input = {
-  image: {
-    bytes: new Uint8Array([1, 2, 3]),
-    mimeType: "image/png" as const,
-    fileName: "screen.png",
-  },
+  images: [
+    {
+      bytes: new Uint8Array([1, 2, 3]),
+      mimeType: "image/png" as const,
+      fileName: "screen-1.png",
+      sequenceIndex: 0,
+    },
+    {
+      bytes: new Uint8Array([4, 5, 6]),
+      mimeType: "image/webp" as const,
+      fileName: "screen-2.webp",
+      sequenceIndex: 1,
+    },
+  ],
   context: { screenTitle: "Checkout" },
 };
 
@@ -36,7 +45,7 @@ afterEach(() => {
 });
 
 describe("GeminiAuditProvider", () => {
-  it("sends the screenshot server-side and returns a validated audit", async () => {
+  it("sends ordered screenshot evidence server-side and returns a validated audit", async () => {
     process.env.GEMINI_API_KEY = "test-key";
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
@@ -56,7 +65,10 @@ describe("GeminiAuditProvider", () => {
     expect(url).toContain("gemini-3.6-flash:generateContent");
     expect(request.headers).toMatchObject({ "x-goog-api-key": "test-key" });
     const body = JSON.parse(String(request.body));
-    expect(body.contents[0].parts[1].inlineData).toEqual({ mimeType: "image/png", data: "AQID" });
+    expect(body.contents[0].parts[1].text).toContain("Evidence 1 of 2");
+    expect(body.contents[0].parts[2].inlineData).toEqual({ mimeType: "image/png", data: "AQID" });
+    expect(body.contents[0].parts[3].text).toContain("Evidence 2 of 2");
+    expect(body.contents[0].parts[4].inlineData).toEqual({ mimeType: "image/webp", data: "BAUG" });
     expect(body.generationConfig.responseMimeType).toBe("application/json");
   });
 
