@@ -35,31 +35,48 @@ export class OpenAIAuditProvider implements AuditProvider {
     const model = process.env.OPENAI_AUDIT_MODEL ?? "gpt-5";
     const imageUrl = `data:${input.image.mimeType};base64,${Buffer.from(input.image.bytes).toString("base64")}`;
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        store: false,
-        input: [
-          {
-            role: "user",
-            content: [
-              { type: "input_text", text: buildAuditPrompt(input.context) },
-              { type: "input_image", image_url: imageUrl, detail: "high" },
-            ],
-          },
-        ],
-      }),
-      signal: AbortSignal.timeout(60_000),
-    });
+    let response: Response;
+    try {
+      response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          store: false,
+          input: [
+            {
+              role: "user",
+              content: [
+                { type: "input_text", text: buildAuditPrompt(input.context) },
+                { type: "input_image", image_url: imageUrl, detail: "high" },
+              ],
+            },
+          ],
+        }),
+        signal: AbortSignal.timeout(60_000),
+      });
+    } catch (error) {
+      if (isTimeoutError(error)) {
+        throw new AuditServiceError(
+          "PROVIDER_TIMEOUT",
+          "The AI provider took too long to complete the audit.",
+          504,
+          "Your inputs are still available. Retry the audit in a moment.",
+        );
+      }
+      throw new AuditServiceError(
+        "PROVIDER_ERROR",
+        "The AI provider could not be reached.",
+        502,
+        "Check your connection and retry the audit.",
+      );
+    }
 
     if (!response.ok) {
-      const detail = await response.text();
-      console.error("OpenAI audit request failed", response.status, detail.slice(0, 500));
+      console.error("OpenAI audit request failed", { status: response.status });
       throw new AuditServiceError(
         "PROVIDER_ERROR",
         "The AI provider could not complete the screenshot review.",
@@ -88,7 +105,7 @@ export class OpenAIAuditProvider implements AuditProvider {
 
     const validated = auditResultSchema.safeParse(result);
     if (!validated.success) {
-      console.error("OpenAI audit response failed validation", validated.error.flatten());
+      console.error("OpenAI audit response failed validation", { issueCount: validated.error.issues.length });
       throw new AuditServiceError(
         "INVALID_RESPONSE",
         "The AI provider returned an incomplete audit report.",
@@ -99,6 +116,10 @@ export class OpenAIAuditProvider implements AuditProvider {
 
     return validated.data;
   }
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError");
 }
 
 function extractOutputText(response: OpenAIResponse): string {
