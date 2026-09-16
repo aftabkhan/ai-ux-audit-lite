@@ -30,6 +30,7 @@ const payload = {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   delete process.env.GEMINI_API_KEY;
   delete process.env.GEMINI_AUDIT_MODEL;
 });
@@ -64,5 +65,26 @@ describe("GeminiAuditProvider", () => {
       code: "PROVIDER_ERROR",
       status: 503,
     });
+  });
+
+  it("maps provider timeout to a recoverable 504 error", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new DOMException("Timed out", "TimeoutError")));
+
+    await expect(new GeminiAuditProvider().review(input)).rejects.toMatchObject({
+      code: "PROVIDER_TIMEOUT",
+      status: 504,
+      recovery: expect.stringContaining("inputs are still available"),
+    });
+  });
+
+  it("does not log upstream response bodies on provider failure", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("sensitive-upstream-detail", { status: 429 })));
+
+    await expect(new GeminiAuditProvider().review(input)).rejects.toMatchObject({ code: "PROVIDER_ERROR" });
+    expect(errorSpy).toHaveBeenCalledWith("Gemini audit request failed", { status: 429 });
+    expect(errorSpy.mock.calls.flat().join(" ")).not.toContain("sensitive-upstream-detail");
   });
 });
