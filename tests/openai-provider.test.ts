@@ -28,11 +28,12 @@ const payload = {
       id: "primary-action",
       title: "Primary action needs stronger emphasis",
       severity: "medium",
-      category: "clarity-of-actions",
+      category: "interaction-design",
       observation: "Primary and secondary actions have similar emphasis.",
       impact: "Users may hesitate before continuing.",
       recommendation: "Increase visual distinction of the primary action.",
       confidence: "high",
+      evidenceRefs: [1],
     },
   ],
 };
@@ -45,7 +46,7 @@ afterEach(() => {
 });
 
 describe("OpenAIAuditProvider", () => {
-  it("returns a validated audit from ordered server-side evidence", async () => {
+  it("separates trusted instructions from reviewer context and sends ordered evidence", async () => {
     process.env.OPENAI_API_KEY = "test-key";
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ output_text: JSON.stringify(payload) }), {
@@ -63,6 +64,10 @@ describe("OpenAIAuditProvider", () => {
     expect(request.headers).toMatchObject({ Authorization: "Bearer test-key" });
     const body = JSON.parse(String(request.body));
     expect(body.store).toBe(false);
+    expect(body.instructions).toContain("untrusted evidence data");
+    expect(body.instructions).not.toContain("Checkout");
+    expect(body.input[0].content[0].text).toContain("Checkout");
+    expect(body.input[0].content[0].text).toContain("untrusted evidence data");
     expect(body.input[0].content[1].text).toContain("Evidence 1 of 2");
     expect(body.input[0].content[2].image_url).toContain("data:image/png;base64,AQID");
     expect(body.input[0].content[3].text).toContain("Evidence 2 of 2");
