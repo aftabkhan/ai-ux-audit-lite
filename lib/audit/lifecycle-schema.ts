@@ -11,6 +11,11 @@ export const auditDefinitionSchema = z.object({
   expectedOutcome: z.string().trim().max(1200).optional(),
 }).strict();
 
+export const auditDefinitionUpdateSchema = auditDefinitionSchema.partial().refine(
+  (value) => Object.keys(value).length > 0,
+  { message: "At least one audit field must be updated." },
+);
+
 export const auditLifecycleStatusSchema = z.enum(AUDIT_LIFECYCLE_STATUSES);
 export const auditDimensionSchema = z.enum(AUDIT_DIMENSIONS);
 
