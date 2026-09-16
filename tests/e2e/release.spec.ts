@@ -48,7 +48,7 @@ test("ordered evidence can be previewed, selectively removed, and selected again
 
   await page.getByRole("button", { name: "Remove evidence 1" }).click();
   await expect(page.getByRole("status")).toContainText("Screenshot removed");
-  await expect(page.getByText("Evidence 1")).toBeVisible();
+  await expect(page.getByText("Evidence 1", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Audit title")).toHaveValue("Checkout payment flow");
   await expect(page.getByLabel("Target user")).toHaveValue("First-time customer");
   await expect(page.getByLabel("Product context")).toHaveValue("Customer moves from cart to payment confirmation.");
