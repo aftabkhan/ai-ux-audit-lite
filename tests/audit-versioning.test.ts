@@ -8,6 +8,9 @@ const context = {
   expiresAt: "2099-01-01T00:00:00.000Z",
 };
 const auditId = "33333333-3333-3333-3333-333333333333";
+const findingId = "44444444-4444-4444-4444-444444444444";
+const runId = "55555555-5555-5555-5555-555555555555";
+const versionId = "66666666-6666-6666-6666-666666666666";
 
 beforeEach(() => {
   process.env.SUPABASE_URL = "https://example.supabase.co";
@@ -21,69 +24,74 @@ afterEach(() => {
 });
 
 describe("audit versioning", () => {
-  it("builds the snapshot from reviewer-owned server state instead of accepting a client snapshot", async () => {
-    const auditRow = {
-      id: auditId,
-      reviewer_id: context.reviewerId,
-      title: "Checkout audit",
-      scope_type: "user-flow",
-      status: "in-review",
-      target_user: null,
-      product_context: null,
-      task_description: null,
-      business_objective: null,
-      expected_outcome: null,
-      archived_at: null,
-      finalized_at: null,
-      created_at: "2026-09-16T00:00:00.000Z",
-      updated_at: "2026-09-16T01:00:00.000Z",
-    };
-    const findingId = "44444444-4444-4444-4444-444444444444";
-    const calls = [
-      new Response(JSON.stringify([auditRow]), { status: 200 }),
-      new Response(JSON.stringify([]), { status: 200 }),
-      new Response(JSON.stringify([{ id: "run-1" }]), { status: 200 }),
-      new Response(JSON.stringify([{
-        id: findingId,
-        source_finding_id: "primary-action",
+  it("creates a version through one reviewer-scoped atomic RPC and validates its snapshot", async () => {
+    const snapshot = {
+      audit: {
+        id: auditId,
+        reviewerId: context.reviewerId,
+        title: "Checkout audit",
+        scopeType: "user-flow",
+        status: "in-review",
+        createdAt: "2026-09-16T00:00:00.000Z",
+        updatedAt: "2026-09-16T01:00:00.000Z",
+      },
+      evidence: [],
+      runId,
+      findings: [{
+        findingId,
+        sourceFindingId: "primary-action",
         dimension: "interaction-design",
-        ai_severity: "medium",
-      }]), { status: 200 }),
+        aiSeverity: "medium",
+        reviewStatus: "accepted",
+        severityOverride: "high",
+        reviewerNote: "Confirmed",
+        approvedRecommendation: "Strengthen the primary action",
+      }],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify([{
-        finding_id: findingId,
-        status: "accepted",
-        severity_override: "high",
-        reviewer_note: "Confirmed",
-        approved_recommendation: "Strengthen the primary action",
-      }]), { status: 200 }),
-      new Response(JSON.stringify([{ version_number: 2 }]), { status: 200 }),
-      new Response(JSON.stringify([{
-        id: "version-3",
+        id: versionId,
         audit_id: auditId,
         reviewer_id: context.reviewerId,
         version_number: 3,
         label: "Review complete",
-        snapshot: {},
+        snapshot,
         created_at: "2026-09-16T02:00:00.000Z",
-      }]), { status: 201 }),
-    ];
-    const fetchMock = vi.fn();
-    calls.forEach((response) => fetchMock.mockResolvedValueOnce(response));
+      }]), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const version = await createAuditVersion(context, auditId, "Review complete");
     expect(version.versionNumber).toBe(3);
+    expect(version.snapshot.runId).toBe(runId);
+    expect(version.snapshot.findings).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledOnce();
 
-    const [, insert] = fetchMock.mock.calls[6] as [string, RequestInit];
-    const body = JSON.parse(String(insert.body));
-    expect(body.reviewer_id).toBe(context.reviewerId);
-    expect(body.snapshot.audit.id).toBe(auditId);
-    expect(body.snapshot.findings[0]).toMatchObject({
-      findingId,
-      reviewStatus: "accepted",
-      aiSeverity: "medium",
-      severityOverride: "high",
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/rpc/create_ai_ux_audit_version");
+    const body = JSON.parse(String(init.body));
+    expect(body).toEqual({
+      p_audit_id: auditId,
+      p_reviewer_id: context.reviewerId,
+      p_label: "Review complete",
     });
+  });
+
+  it("rejects malformed persisted snapshots instead of trusting storage output", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([{
+        id: versionId,
+        audit_id: auditId,
+        reviewer_id: context.reviewerId,
+        version_number: 1,
+        label: "Broken",
+        snapshot: { findings: "not-an-array" },
+        created_at: "2026-09-16T02:00:00.000Z",
+      }]), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(createAuditVersion(context, auditId, "Broken")).rejects.toThrow();
   });
 
   it("compares human decisions without mutating either snapshot", () => {
@@ -99,7 +107,7 @@ describe("audit versioning", () => {
       },
       evidence: [],
       findings: [{
-        findingId: "finding-1",
+        findingId,
         sourceFindingId: "finding-1",
         dimension: "usability" as const,
         aiSeverity: "medium" as const,
