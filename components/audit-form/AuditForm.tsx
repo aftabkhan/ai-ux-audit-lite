@@ -3,12 +3,16 @@
 import { ChangeEvent, FormEvent, useEffect, useId, useRef, useState } from "react";
 import { AuditResults } from "@/components/audit-results/AuditResults";
 import { validateScreenshot } from "@/lib/validation/file";
-import type { AuditError, AuditResult } from "@/src/types/audit";
+import type { AuditError, AuditResult, AuditScopeType } from "@/src/types/audit";
 
 interface FormState {
   screenTitle: string;
+  scopeType: AuditScopeType;
   productContext: string;
   targetUser: string;
+  taskDescription: string;
+  businessObjective: string;
+  expectedOutcome: string;
 }
 
 interface EvidencePreview {
@@ -18,8 +22,12 @@ interface EvidencePreview {
 
 const initialFormState: FormState = {
   screenTitle: "",
+  scopeType: "single-screen",
   productContext: "",
   targetUser: "",
+  taskDescription: "",
+  businessObjective: "",
+  expectedOutcome: "",
 };
 
 const MAX_SCREENSHOTS = 8;
@@ -81,9 +89,7 @@ export function AuditForm() {
     setStatus("");
     setResult(null);
 
-    if (selectedFiles.length === 0) {
-      return;
-    }
+    if (selectedFiles.length === 0) return;
 
     if (selectedFiles.length > MAX_SCREENSHOTS) {
       setFileError(`Choose no more than ${MAX_SCREENSHOTS} screenshots for one audit.`);
@@ -115,7 +121,7 @@ export function AuditForm() {
     setFileError(null);
   }
 
-  function updateField(field: keyof FormState, value: string) {
+  function updateField<K extends keyof FormState>(field: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
@@ -140,7 +146,11 @@ export function AuditForm() {
     const body = new FormData();
     evidence.forEach(({ file }) => body.append("screenshot", file));
     body.set("screenTitle", form.screenTitle);
+    body.set("scopeType", form.scopeType);
     body.set("targetUser", form.targetUser);
+    body.set("taskDescription", form.taskDescription);
+    body.set("businessObjective", form.businessObjective);
+    body.set("expectedOutcome", form.expectedOutcome);
     body.set("productContext", form.productContext);
 
     try {
@@ -235,23 +245,47 @@ export function AuditForm() {
         <section className="form-section" aria-labelledby="context-heading">
           <div className="section-heading">
             <span className="step-label">Step 2</span>
-            <h2 id="context-heading">Add context</h2>
-            <p>Context helps the review stay relevant to the screen sequence, product, task, and intended audience.</p>
+            <h2 id="context-heading">Define the audit</h2>
+            <p>Describe the scope, user task and intended outcome so findings stay grounded in the evidence and real product context.</p>
           </div>
 
           <div className="field-grid">
             <label>
-              <span>Audit / screen title</span>
-              <input type="text" value={form.screenTitle} onChange={(event) => updateField("screenTitle", event.target.value)} maxLength={100} placeholder="Example: Checkout flow" disabled={isSubmitting} />
+              <span>Audit title</span>
+              <input type="text" value={form.screenTitle} onChange={(event) => updateField("screenTitle", event.target.value)} maxLength={160} placeholder="Example: Mobile checkout flow" disabled={isSubmitting} />
+            </label>
+            <label>
+              <span>Audit scope</span>
+              <select value={form.scopeType} onChange={(event) => updateField("scopeType", event.target.value as AuditScopeType)} disabled={isSubmitting}>
+                <option value="single-screen">Single screen</option>
+                <option value="multi-screen">Multiple screens</option>
+                <option value="user-flow">User flow</option>
+                <option value="page-sequence">Website / page sequence</option>
+                <option value="product-workflow">Product workflow</option>
+              </select>
             </label>
             <label>
               <span>Target user</span>
-              <input type="text" value={form.targetUser} onChange={(event) => updateField("targetUser", event.target.value)} maxLength={120} placeholder="Example: First-time mobile customer" disabled={isSubmitting} />
+              <input type="text" value={form.targetUser} onChange={(event) => updateField("targetUser", event.target.value)} maxLength={240} placeholder="Example: First-time mobile customer" disabled={isSubmitting} />
+            </label>
+            <label>
+              <span>Expected user outcome</span>
+              <input type="text" value={form.expectedOutcome} onChange={(event) => updateField("expectedOutcome", event.target.value)} maxLength={1200} placeholder="Example: Complete payment confidently" disabled={isSubmitting} />
+            </label>
+            <label className="full-width">
+              <span>Task description</span>
+              <textarea value={form.taskDescription} onChange={(event) => updateField("taskDescription", event.target.value)} maxLength={1200} rows={3} placeholder="Describe the task the user is trying to complete across the supplied evidence." disabled={isSubmitting} />
+              <small>{form.taskDescription.length}/1200 characters</small>
+            </label>
+            <label className="full-width">
+              <span>Business objective</span>
+              <textarea value={form.businessObjective} onChange={(event) => updateField("businessObjective", event.target.value)} maxLength={1200} rows={3} placeholder="Example: Reduce checkout abandonment while preserving trust." disabled={isSubmitting} />
+              <small>{form.businessObjective.length}/1200 characters</small>
             </label>
             <label className="full-width">
               <span>Product context</span>
-              <textarea value={form.productContext} onChange={(event) => updateField("productContext", event.target.value)} maxLength={600} rows={5} placeholder="Describe the user goal, sequence, business context, or known constraints." disabled={isSubmitting} />
-              <small>{form.productContext.length}/600 characters</small>
+              <textarea value={form.productContext} onChange={(event) => updateField("productContext", event.target.value)} maxLength={2000} rows={4} placeholder="Add product, device, known constraints, or other context visible evidence cannot provide." disabled={isSubmitting} />
+              <small>{form.productContext.length}/2000 characters</small>
             </label>
           </div>
         </section>
