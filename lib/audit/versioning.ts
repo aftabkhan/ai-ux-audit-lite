@@ -85,6 +85,20 @@ function toVersion(row: VersionRow): PersistedAuditVersion {
   };
 }
 
+function validateOwnedVersion(
+  rows: VersionRow[],
+  context: ProductLabAuditContext,
+  auditId: string,
+  operation: string,
+): PersistedAuditVersion {
+  if (rows.length !== 1) throw new Error(`${operation} returned an unexpected result.`);
+  const version = toVersion(rows[0]);
+  if (version.reviewerId !== context.reviewerId || version.auditId !== auditId) {
+    throw new Error("Audit version ownership validation failed.");
+  }
+  return version;
+}
+
 export async function createAuditVersion(
   context: ProductLabAuditContext,
   auditId: string,
@@ -100,10 +114,27 @@ export async function createAuditVersion(
       p_label: safeLabel,
     }),
   });
-  if (rows.length !== 1) throw new Error("Audit version creation returned an unexpected result.");
-  const version = toVersion(rows[0]);
-  if (version.reviewerId !== context.reviewerId || version.auditId !== auditId) {
-    throw new Error("Audit version ownership validation failed.");
+  return validateOwnedVersion(rows, context, auditId, "Audit version creation");
+}
+
+export async function finalizeAudit(
+  context: ProductLabAuditContext,
+  auditId: string,
+  label = "Final reviewed audit",
+): Promise<PersistedAuditVersion> {
+  assertContext(context);
+  const safeLabel = versionLabelSchema.parse(label);
+  const rows = await request<VersionRow[]>("/rest/v1/rpc/finalize_ai_ux_audit", {
+    method: "POST",
+    body: JSON.stringify({
+      p_audit_id: auditId,
+      p_reviewer_id: context.reviewerId,
+      p_version_label: safeLabel,
+    }),
+  });
+  const version = validateOwnedVersion(rows, context, auditId, "Audit finalization");
+  if (version.snapshot.audit.status !== "finalized" || !version.snapshot.audit.finalizedAt) {
+    throw new Error("Audit finalization returned a non-finalized snapshot.");
   }
   return version;
 }
