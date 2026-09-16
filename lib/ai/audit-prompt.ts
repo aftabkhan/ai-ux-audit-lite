@@ -1,4 +1,5 @@
 import type { AuditContext } from "@/src/types/audit";
+import { AUDIT_DIMENSIONS } from "@/src/types/audit-lifecycle";
 
 export function buildAuditPrompt(context: AuditContext, evidenceCount = 1): string {
   const contextLines = [
@@ -14,27 +15,23 @@ export function buildAuditPrompt(context: AuditContext, evidenceCount = 1): stri
   const evidenceDescription = evidenceCount === 1
     ? "one interface screenshot"
     : `${evidenceCount} ordered interface screenshots that may represent a sequence or flow`;
+  const dimensions = AUDIT_DIMENSIONS.map((dimension, index) => `${index + 1}. ${dimension}`).join("\n");
 
   return `You are a senior UX reviewer evaluating ${evidenceDescription}.
 
-Analyze only what is visible in the supplied evidence and what is supported by the supplied context. Treat evidence order as meaningful when multiple screenshots are provided. Do not invent hidden flows, analytics, research findings, technical implementation, contrast ratios, keyboard behavior, or screen-reader behavior. When something cannot be verified, say so and lower confidence.
+Analyze only what is visible in the supplied evidence and what is supported by the supplied context. Treat evidence order as meaningful when multiple screenshots are provided. Do not invent hidden flows, analytics, research findings, technical implementation, contrast ratios, keyboard behavior, or screen-reader behavior. When something cannot be verified, state the limitation and lower confidence.
 
 When multiple screenshots are supplied:
 - compare continuity, hierarchy, navigation, labels, feedback and task progression across the sequence;
 - identify cross-screen inconsistency or workflow friction only when evidence supports it;
 - never claim behavior that is not visible in the sequence.
 
-Every finding must identify the 1-based evidence positions that support it in evidenceRefs. Use only integers from 1 through ${evidenceCount}. If a finding is supported by more than one screenshot, include each relevant position. Do not cite evidence that does not support the observation.
+Every finding must identify the 1-based evidence positions that support it in evidenceRefs. Use only integers from 1 through ${evidenceCount}. If a finding is supported by more than one screenshot, include each relevant position.
 
-Review the interface evidence across these eight currently supported lenses:
-1. visual-hierarchy
-2. navigation-orientation
-3. clarity-of-actions
-4. consistency
-5. readability
-6. feedback-system-status
-7. error-prevention-recovery
-8. accessibility-basics
+Choose exactly one category for every finding from these professional audit dimensions:
+${dimensions}
+
+Use a dimension only when the supplied evidence can support it. For dimensions that require implementation or interaction evidence beyond screenshots, state the limitation instead of making a compliance or behavior claim.
 
 ${contextLines.length ? `Context:\n${contextLines.join("\n")}` : "No additional product context was supplied."}
 
@@ -48,7 +45,7 @@ Return valid JSON only. Do not wrap it in markdown. Use this exact structure:
       "id": "short-kebab-case-id",
       "title": "concise finding title",
       "severity": "high|medium|low",
-      "category": "one of the eight lens identifiers",
+      "category": "one listed professional audit dimension identifier",
       "observation": "specific evidence-grounded observation",
       "impact": "likely user or business impact stated cautiously",
       "recommendation": "specific and actionable improvement",
