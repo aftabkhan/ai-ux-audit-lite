@@ -4,6 +4,7 @@ import { AuditServiceError, toAuditError } from "@/lib/audit/errors";
 import { findingsReferenceSubmittedEvidence } from "@/lib/audit/evidence-refs";
 import { parseAuditContextFromFormData } from "@/lib/audit/request-context";
 import { auditResultSchema } from "@/lib/audit/schema";
+import { getProductLabIdentity, productLabProtectionEnabled } from "@/lib/product-lab/auth";
 import { checkAuditRateLimit } from "@/lib/security/rate-limit";
 import { ACCEPTED_SCREENSHOT_TYPES, MAX_SCREENSHOT_BYTES } from "@/lib/validation/file";
 
@@ -14,6 +15,23 @@ const MAX_COMBINED_SCREENSHOT_BYTES = 20 * 1024 * 1024;
 
 export async function POST(request: Request) {
   try {
+    if (productLabProtectionEnabled()) {
+      const identity = await getProductLabIdentity();
+      if (!identity) {
+        return NextResponse.json(
+          {
+            code: "ACCESS_REQUIRED",
+            message: "A valid Product Lab invitation is required.",
+            recovery: "Return to the private Product Lab and open AI UX Audit from your assigned products.",
+          },
+          {
+            status: 401,
+            headers: { "Cache-Control": "no-store" },
+          },
+        );
+      }
+    }
+
     const identifier = getClientIdentifier(request);
     const rateLimit = checkAuditRateLimit(identifier);
 
