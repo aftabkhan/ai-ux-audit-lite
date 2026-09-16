@@ -1,0 +1,156 @@
+import type { AuditDefinition, PersistedAudit, ProductLabAuditContext } from "@/src/types/audit-lifecycle";
+import { auditDefinitionSchema } from "@/lib/audit/lifecycle-schema";
+
+interface AuditRow {
+  id: string;
+  reviewer_id: string;
+  title: string;
+  scope_type: PersistedAudit["scopeType"];
+  status: PersistedAudit["status"];
+  target_user: string | null;
+  product_context: string | null;
+  task_description: string | null;
+  business_objective: string | null;
+  expected_outcome: string | null;
+  archived_at: string | null;
+  finalized_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function config() {
+  const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("Audit persistence is not configured.");
+  return { url, key };
+}
+
+function headers(extra?: HeadersInit) {
+  const { key } = config();
+  const result = new Headers(extra);
+  result.set("apikey", key);
+  result.set("Content-Type", "application/json");
+  if (!key.startsWith("sb_secret_")) result.set("Authorization", `Bearer ${key}`);
+  return result;
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const { url } = config();
+  const response = await fetch(`${url}${path}`, {
+    ...init,
+    headers: headers(init.headers),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Audit storage request failed (${response.status}).`);
+  }
+
+  if (response.status === 204) return undefined as T;
+  return (await response.json()) as T;
+}
+
+function assertAuditContext(context: ProductLabAuditContext) {
+  if (context.productKey !== "ai-ux-audit") throw new Error("Audit product access is required.");
+  if (!context.reviewerId || !context.sessionId) throw new Error("Validated Product Lab context is required.");
+  if (Date.parse(context.expiresAt) <= Date.now()) throw new Error("Product Lab session has expired.");
+}
+
+function eq(value: string) {
+  return encodeURIComponent(`eq.${value}`);
+}
+
+function toPersistedAudit(row: AuditRow): PersistedAudit {
+  return {
+    id: row.id,
+    reviewerId: row.reviewer_id,
+    title: row.title,
+    scopeType: row.scope_type,
+    status: row.status,
+    targetUser: row.target_user ?? undefined,
+    productContext: row.product_context ?? undefined,
+    taskDescription: row.task_description ?? undefined,
+    businessObjective: row.business_objective ?? undefined,
+    expectedOutcome: row.expected_outcome ?? undefined,
+    archivedAt: row.archived_at ?? undefined,
+    finalizedAt: row.finalized_at ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function createAudit(context: ProductLabAuditContext, input: AuditDefinition): Promise<PersistedAudit> {
+  assertAuditContext(context);
+  const parsed = auditDefinitionSchema.parse(input);
+  const rows = await request<AuditRow[]>("/rest/v1/ai_ux_audits", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      reviewer_id: context.reviewerId,
+      title: parsed.title,
+      scope_type: parsed.scopeType,
+      target_user: parsed.targetUser ?? null,
+      product_context: parsed.productContext ?? null,
+      task_description: parsed.taskDescription ?? null,
+      business_objective: parsed.businessObjective ?? null,
+      expected_outcome: parsed.expectedOutcome ?? null,
+    }),
+  });
+
+  if (rows.length !== 1) throw new Error("Audit creation returned an unexpected result.");
+  return toPersistedAudit(rows[0]);
+}
+
+export async function listAudits(context: ProductLabAuditContext, includeArchived = false): Promise<PersistedAudit[]> {
+  assertAuditContext(context);
+  const archivedFilter = includeArchived ? "" : "&status=neq.archived";
+  const rows = await request<AuditRow[]>(
+    `/rest/v1/ai_ux_audits?reviewer_id=${eq(context.reviewerId)}${archivedFilter}&order=updated_at.desc`,
+  );
+  return rows.map(toPersistedAudit);
+}
+
+export async function getAudit(context: ProductLabAuditContext, auditId: string): Promise<PersistedAudit | null> {
+  assertAuditContext(context);
+  const rows = await request<AuditRow[]>(
+    `/rest/v1/ai_ux_audits?id=${eq(auditId)}&reviewer_id=${eq(context.reviewerId)}&limit=1`,
+  );
+  return rows[0] ? toPersistedAudit(rows[0]) : null;
+}
+
+export async function archiveAudit(context: ProductLabAuditContext, auditId: string): Promise<PersistedAudit | null> {
+  assertAuditContext(context);
+  const now = new Date().toISOString();
+  const rows = await request<AuditRow[]>(
+    `/rest/v1/ai_ux_audits?id=${eq(auditId)}&reviewer_id=${eq(context.reviewerId)}&status=neq.archived`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ status: "archived", archived_at: now, updated_at: now }),
+    },
+  );
+  return rows[0] ? toPersistedAudit(rows[0]) : null;
+}
+
+export async function restoreAudit(context: ProductLabAuditContext, auditId: string): Promise<PersistedAudit | null> {
+  assertAuditContext(context);
+  const now = new Date().toISOString();
+  const rows = await request<AuditRow[]>(
+    `/rest/v1/ai_ux_audits?id=${eq(auditId)}&reviewer_id=${eq(context.reviewerId)}&status=eq.archived`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ status: "in-review", archived_at: null, updated_at: now }),
+    },
+  );
+  return rows[0] ? toPersistedAudit(rows[0]) : null;
+}
+
+export async function deleteAudit(context: ProductLabAuditContext, auditId: string): Promise<boolean> {
+  assertAuditContext(context);
+  const rows = await request<Array<{ id: string }>>(
+    `/rest/v1/ai_ux_audits?id=${eq(auditId)}&reviewer_id=${eq(context.reviewerId)}`,
+    { method: "DELETE", headers: { Prefer: "return=representation" } },
+  );
+  return rows.length === 1;
+}
