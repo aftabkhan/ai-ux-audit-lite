@@ -214,6 +214,7 @@ export function AuditForm() {
             accept="image/png,image/jpeg,image/webp"
             multiple
             onChange={handleFileChange}
+            aria-label="Choose screenshots, 1 to 8 images"
             aria-describedby={fileError ? `${fileInputId}-error` : undefined}
             aria-invalid={Boolean(fileError)}
             disabled={isSubmitting}
