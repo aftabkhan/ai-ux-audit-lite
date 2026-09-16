@@ -1,5 +1,5 @@
 import type { AuditProvider, AuditProviderInput } from "@/lib/ai/provider";
-import { buildAuditPrompt } from "@/lib/ai/audit-prompt";
+import { buildAuditContextMessage, buildAuditInstructions } from "@/lib/ai/audit-prompt";
 import { AuditServiceError } from "@/lib/audit/errors";
 import { auditResultSchema } from "@/lib/audit/schema";
 import type { AuditResult } from "@/src/types/audit";
@@ -60,11 +60,12 @@ export class OpenAIAuditProvider implements AuditProvider {
         body: JSON.stringify({
           model,
           store: false,
+          instructions: buildAuditInstructions(input.images.length),
           input: [
             {
               role: "user",
               content: [
-                { type: "input_text", text: buildAuditPrompt(input.context, input.images.length) },
+                { type: "input_text", text: buildAuditContextMessage(input.context) },
                 ...evidenceContent,
               ],
             },
