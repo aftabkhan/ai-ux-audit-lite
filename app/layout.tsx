@@ -1,5 +1,11 @@
 import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
+import { redirect } from "next/navigation";
+import {
+  getProductLabIdentity,
+  productLabPortalUrl,
+  productLabProtectionEnabled,
+} from "@/lib/product-lab/auth";
 import "./globals.css";
 import "./audit-progress.css";
 import "./audit-report.css";
@@ -22,6 +28,8 @@ const siteUrl = new URL(
     ? process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
     : "https://audit.aftabkhan.net",
 );
+
+const protectedMode = process.env.PRODUCT_LAB_PROTECTED === "true";
 
 export const metadata: Metadata = {
   metadataBase: siteUrl,
@@ -46,13 +54,25 @@ export const metadata: Metadata = {
     title: "AI UX Audit Lite",
     description: "A focused AI-assisted UX review tool for interface screenshots.",
   },
-  robots: {
-    index: true,
-    follow: true,
-  },
+  robots: protectedMode
+    ? { index: false, follow: false, noarchive: true, nocache: true }
+    : { index: true, follow: true },
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  if (productLabProtectionEnabled()) {
+    let identity = null;
+    try {
+      identity = await getProductLabIdentity();
+    } catch {
+      identity = null;
+    }
+
+    if (!identity) {
+      redirect(`${productLabPortalUrl()}/reviewer?product=ai-ux-audit`);
+    }
+  }
+
   return (
     <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
       <body>{children}</body>
