@@ -1,63 +1,13 @@
-import { versionLabelSchema } from "@/lib/audit/lifecycle-schema";
-import type {
-  AuditDimension,
-  AuditEvidenceRecord,
-  AuditVersionSnapshot,
-  PersistedAudit,
-  ProductLabAuditContext,
-} from "@/src/types/audit-lifecycle";
+import { auditVersionSnapshotSchema, versionLabelSchema } from "@/lib/audit/lifecycle-schema";
+import type { AuditVersionSnapshot, ProductLabAuditContext } from "@/src/types/audit-lifecycle";
 
-interface AuditRow {
-  id: string;
-  reviewer_id: string;
-  title: string;
-  scope_type: PersistedAudit["scopeType"];
-  status: PersistedAudit["status"];
-  target_user: string | null;
-  product_context: string | null;
-  task_description: string | null;
-  business_objective: string | null;
-  expected_outcome: string | null;
-  archived_at: string | null;
-  finalized_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface EvidenceRow {
-  id: string;
-  audit_id: string;
-  reviewer_id: string;
-  evidence_type: "screenshot";
-  label: string;
-  sequence_index: number;
-  object_key: string;
-  mime_type: AuditEvidenceRecord["mimeType"];
-  byte_size: number;
-  created_at: string;
-}
-
-interface RunRow { id: string }
-interface FindingRow {
-  id: string;
-  source_finding_id: string;
-  dimension: AuditDimension;
-  ai_severity: "critical" | "high" | "medium" | "low";
-}
-interface ReviewRow {
-  finding_id: string;
-  status: "unreviewed" | "accepted" | "dismissed";
-  severity_override: "critical" | "high" | "medium" | "low" | null;
-  reviewer_note: string | null;
-  approved_recommendation: string | null;
-}
 interface VersionRow {
   id: string;
   audit_id: string;
   reviewer_id: string;
   version_number: number;
   label: string;
-  snapshot: AuditVersionSnapshot;
+  snapshot: unknown;
   created_at: string;
 }
 
@@ -119,48 +69,18 @@ function eq(value: string) {
   return encodeURIComponent(`eq.${value}`);
 }
 
-function toAudit(row: AuditRow): PersistedAudit {
-  return {
-    id: row.id,
-    reviewerId: row.reviewer_id,
-    title: row.title,
-    scopeType: row.scope_type,
-    status: row.status,
-    targetUser: row.target_user ?? undefined,
-    productContext: row.product_context ?? undefined,
-    taskDescription: row.task_description ?? undefined,
-    businessObjective: row.business_objective ?? undefined,
-    expectedOutcome: row.expected_outcome ?? undefined,
-    archivedAt: row.archived_at ?? undefined,
-    finalizedAt: row.finalized_at ?? undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
-function toEvidence(row: EvidenceRow): AuditEvidenceRecord {
-  return {
-    id: row.id,
-    auditId: row.audit_id,
-    reviewerId: row.reviewer_id,
-    evidenceType: row.evidence_type,
-    label: row.label,
-    sequenceIndex: row.sequence_index,
-    objectKey: row.object_key,
-    mimeType: row.mime_type,
-    byteSize: row.byte_size,
-    createdAt: row.created_at,
-  };
-}
-
 function toVersion(row: VersionRow): PersistedAuditVersion {
+  if (!row.id || !row.audit_id || !row.reviewer_id || !Number.isInteger(row.version_number) || row.version_number < 1) {
+    throw new Error("Audit version storage returned invalid metadata.");
+  }
+  const snapshot = auditVersionSnapshotSchema.parse(row.snapshot);
   return {
     id: row.id,
     auditId: row.audit_id,
     reviewerId: row.reviewer_id,
     versionNumber: row.version_number,
     label: row.label,
-    snapshot: row.snapshot,
+    snapshot,
     createdAt: row.created_at,
   };
 }
@@ -172,52 +92,20 @@ export async function createAuditVersion(
 ): Promise<PersistedAuditVersion> {
   assertContext(context);
   const safeLabel = versionLabelSchema.parse(label);
-  const owner = `audit_id=${eq(auditId)}&reviewer_id=${eq(context.reviewerId)}`;
-
-  const [audits, evidence, runs, findings, reviews, previousVersions] = await Promise.all([
-    request<AuditRow[]>(`/rest/v1/ai_ux_audits?id=${eq(auditId)}&reviewer_id=${eq(context.reviewerId)}&limit=1`),
-    request<EvidenceRow[]>(`/rest/v1/ai_ux_audit_evidence?${owner}&order=sequence_index.asc`),
-    request<RunRow[]>(`/rest/v1/ai_ux_audit_runs?${owner}&select=id&order=created_at.desc&limit=1`),
-    request<FindingRow[]>(`/rest/v1/ai_ux_audit_findings?${owner}&select=id,source_finding_id,dimension,ai_severity&order=created_at.asc`),
-    request<ReviewRow[]>(`/rest/v1/ai_ux_audit_reviews?${owner}&select=finding_id,status,severity_override,reviewer_note,approved_recommendation`),
-    request<Array<{ version_number: number }>>(`/rest/v1/ai_ux_audit_versions?${owner}&select=version_number&order=version_number.desc&limit=1`),
-  ]);
-
-  if (audits.length !== 1) throw new Error("Audit not found or access denied.");
-  const reviewByFinding = new Map(reviews.map((review) => [review.finding_id, review]));
-  const snapshot: AuditVersionSnapshot = {
-    audit: toAudit(audits[0]),
-    evidence: evidence.map(toEvidence),
-    runId: runs[0]?.id,
-    findings: findings.map((finding) => {
-      const review = reviewByFinding.get(finding.id);
-      return {
-        findingId: finding.id,
-        sourceFindingId: finding.source_finding_id,
-        dimension: finding.dimension,
-        aiSeverity: finding.ai_severity,
-        reviewStatus: review?.status ?? "unreviewed",
-        severityOverride: review?.severity_override ?? undefined,
-        reviewerNote: review?.reviewer_note ?? undefined,
-        approvedRecommendation: review?.approved_recommendation ?? undefined,
-      };
-    }),
-  };
-  const versionNumber = (previousVersions[0]?.version_number ?? 0) + 1;
-
-  const rows = await request<VersionRow[]>("/rest/v1/ai_ux_audit_versions", {
+  const rows = await request<VersionRow[]>("/rest/v1/rpc/create_ai_ux_audit_version", {
     method: "POST",
-    headers: { Prefer: "return=representation" },
     body: JSON.stringify({
-      audit_id: auditId,
-      reviewer_id: context.reviewerId,
-      version_number: versionNumber,
-      label: safeLabel,
-      snapshot,
+      p_audit_id: auditId,
+      p_reviewer_id: context.reviewerId,
+      p_label: safeLabel,
     }),
   });
   if (rows.length !== 1) throw new Error("Audit version creation returned an unexpected result.");
-  return toVersion(rows[0]);
+  const version = toVersion(rows[0]);
+  if (version.reviewerId !== context.reviewerId || version.auditId !== auditId) {
+    throw new Error("Audit version ownership validation failed.");
+  }
+  return version;
 }
 
 export async function listAuditVersions(
