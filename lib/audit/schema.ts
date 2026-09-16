@@ -13,11 +13,22 @@ export const auditCategorySchema = z.enum([
 
 export const severitySchema = z.enum(["critical", "high", "medium", "low"]);
 export const confidenceSchema = z.enum(["high", "medium", "low"]);
+export const auditScopeTypeSchema = z.enum([
+  "single-screen",
+  "multi-screen",
+  "user-flow",
+  "page-sequence",
+  "product-workflow",
+]);
 
 export const auditContextSchema = z.object({
-  screenTitle: z.string().trim().max(100).optional(),
-  productContext: z.string().trim().max(600).optional(),
-  targetUser: z.string().trim().max(120).optional(),
+  screenTitle: z.string().trim().max(160).optional(),
+  scopeType: auditScopeTypeSchema.optional(),
+  productContext: z.string().trim().max(2000).optional(),
+  targetUser: z.string().trim().max(240).optional(),
+  taskDescription: z.string().trim().max(1200).optional(),
+  businessObjective: z.string().trim().max(1200).optional(),
+  expectedOutcome: z.string().trim().max(1200).optional(),
 });
 
 export const auditFindingSchema = z.object({
@@ -29,6 +40,7 @@ export const auditFindingSchema = z.object({
   impact: z.string().min(1),
   recommendation: z.string().min(1),
   confidence: confidenceSchema,
+  evidenceRefs: z.array(z.number().int().min(1).max(8)).min(1).max(8).optional(),
 });
 
 export const auditResultSchema = z.object({
