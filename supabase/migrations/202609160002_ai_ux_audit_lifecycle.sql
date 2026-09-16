@@ -105,12 +105,26 @@ create table if not exists public.ai_ux_audit_versions (
   check (jsonb_typeof(snapshot) = 'object')
 );
 
+create table if not exists public.ai_ux_audit_deletion_jobs (
+  id uuid primary key default gen_random_uuid(),
+  reviewer_id uuid not null references public.product_lab_reviewers(id) on delete cascade,
+  audit_id uuid not null,
+  object_keys text[] not null default '{}',
+  status text not null default 'pending' check (status in ('pending','completed','failed')),
+  failure_code text,
+  created_at timestamptz not null default now(),
+  completed_at timestamptz,
+  updated_at timestamptz not null default now(),
+  check ((status = 'completed') = (completed_at is not null))
+);
+
 create index if not exists ai_ux_audits_reviewer_updated_idx on public.ai_ux_audits(reviewer_id, updated_at desc);
 create index if not exists ai_ux_audits_reviewer_status_idx on public.ai_ux_audits(reviewer_id, status);
 create index if not exists ai_ux_audit_evidence_audit_idx on public.ai_ux_audit_evidence(audit_id, sequence_index);
 create index if not exists ai_ux_audit_runs_audit_idx on public.ai_ux_audit_runs(audit_id, created_at desc);
 create index if not exists ai_ux_audit_findings_audit_idx on public.ai_ux_audit_findings(audit_id);
 create index if not exists ai_ux_audit_versions_audit_idx on public.ai_ux_audit_versions(audit_id, version_number desc);
+create index if not exists ai_ux_audit_deletion_jobs_status_idx on public.ai_ux_audit_deletion_jobs(status, updated_at);
 
 alter table public.ai_ux_audits enable row level security;
 alter table public.ai_ux_audit_evidence enable row level security;
@@ -118,6 +132,7 @@ alter table public.ai_ux_audit_runs enable row level security;
 alter table public.ai_ux_audit_findings enable row level security;
 alter table public.ai_ux_audit_reviews enable row level security;
 alter table public.ai_ux_audit_versions enable row level security;
+alter table public.ai_ux_audit_deletion_jobs enable row level security;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
@@ -129,10 +144,56 @@ values (
 )
 on conflict (id) do nothing;
 
+create or replace function public.prepare_ai_ux_audit_deletion(
+  p_audit_id uuid,
+  p_reviewer_id uuid
+)
+returns table (
+  deletion_job_id uuid,
+  object_keys text[]
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_job_id uuid;
+  v_object_keys text[];
+begin
+  if not exists (
+    select 1 from public.ai_ux_audits
+    where id = p_audit_id and reviewer_id = p_reviewer_id
+  ) then
+    raise exception 'AUDIT_NOT_FOUND_OR_FORBIDDEN';
+  end if;
+
+  select coalesce(array_agg(e.object_key order by e.sequence_index), '{}'::text[])
+  into v_object_keys
+  from public.ai_ux_audit_evidence e
+  where e.audit_id = p_audit_id and e.reviewer_id = p_reviewer_id;
+
+  insert into public.ai_ux_audit_deletion_jobs (reviewer_id, audit_id, object_keys)
+  values (p_reviewer_id, p_audit_id, v_object_keys)
+  returning id into v_job_id;
+
+  delete from public.ai_ux_audits
+  where id = p_audit_id and reviewer_id = p_reviewer_id;
+
+  return query select v_job_id, v_object_keys;
+end;
+$$;
+
+revoke all on function public.prepare_ai_ux_audit_deletion(uuid, uuid) from public;
+revoke all on function public.prepare_ai_ux_audit_deletion(uuid, uuid) from anon;
+revoke all on function public.prepare_ai_ux_audit_deletion(uuid, uuid) from authenticated;
+grant execute on function public.prepare_ai_ux_audit_deletion(uuid, uuid) to service_role;
+
 -- No browser database or storage policies are intentionally created. The product server uses
 -- the service role only after validating the Product Lab session and the `ai-ux-audit` grant.
--- Every query and object-storage operation must additionally scope ownership from reviewer_id
--- in that trusted context. Composite foreign keys defend against cross-reviewer relationships
--- even if application code regresses. This migration requires the Product Lab foundation first.
+-- Every query and object-storage operation must additionally scope ownership from reviewer_id.
+-- Composite foreign keys defend against cross-reviewer relationships even if application code
+-- regresses. The deletion job survives audit cascade deletion so failed Storage API cleanup is
+-- observable and retryable rather than silently orphaning sensitive evidence.
+-- This migration requires the Product Lab foundation migration first.
 
 commit;
