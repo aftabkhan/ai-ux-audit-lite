@@ -109,8 +109,19 @@ alter table public.ai_ux_audit_findings enable row level security;
 alter table public.ai_ux_audit_reviews enable row level security;
 alter table public.ai_ux_audit_versions enable row level security;
 
--- No browser policies are intentionally created. The product server uses the service role only
--- after validating the Product Lab session and the `ai-ux-audit` product grant. Every product
--- query must additionally scope by reviewer_id from that trusted server context.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'ai-ux-audit-evidence',
+  'ai-ux-audit-evidence',
+  false,
+  5242880,
+  array['image/png','image/jpeg','image/webp']
+)
+on conflict (id) do nothing;
+
+-- No browser database or storage policies are intentionally created. The product server uses
+-- the service role only after validating the Product Lab session and the `ai-ux-audit` grant.
+-- Every query and object-storage operation must additionally scope ownership from reviewer_id
+-- in that trusted context. This migration requires the Product Lab foundation migration first.
 
 commit;
