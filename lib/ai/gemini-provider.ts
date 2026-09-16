@@ -33,8 +33,21 @@ export class GeminiAuditProvider implements AuditProvider {
       );
     }
 
+    if (input.images.length === 0) {
+      throw new AuditServiceError("INVALID_REQUEST", "At least one screenshot is required.", 400);
+    }
+
     const model = process.env.GEMINI_AUDIT_MODEL ?? "gemini-3.6-flash";
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    const evidenceParts = input.images.flatMap((image, index) => [
+      { text: `Evidence ${index + 1} of ${input.images.length}: ${safeEvidenceLabel(image.fileName)}` },
+      {
+        inlineData: {
+          mimeType: image.mimeType,
+          data: Buffer.from(image.bytes).toString("base64"),
+        },
+      },
+    ]);
 
     let response: Response;
     try {
@@ -48,15 +61,7 @@ export class GeminiAuditProvider implements AuditProvider {
           contents: [
             {
               role: "user",
-              parts: [
-                { text: buildAuditPrompt(input.context) },
-                {
-                  inlineData: {
-                    mimeType: input.image.mimeType,
-                    data: Buffer.from(input.image.bytes).toString("base64"),
-                  },
-                },
-              ],
+              parts: [{ text: buildAuditPrompt(input.context, input.images.length) }, ...evidenceParts],
             },
           ],
           generationConfig: {
@@ -106,7 +111,7 @@ export class GeminiAuditProvider implements AuditProvider {
       },
       findings: parsed.findings,
       disclaimer:
-        "AI-generated first-pass UX review based on one screenshot and the context provided. Validate findings through user research, accessibility testing, analytics, and expert review before making product decisions.",
+        "AI-generated first-pass UX review based on the supplied screenshot evidence and context. Validate findings through user research, accessibility testing, analytics, and expert review before making product decisions.",
     };
 
     const validated = auditResultSchema.safeParse(result);
@@ -126,6 +131,10 @@ export class GeminiAuditProvider implements AuditProvider {
 
 function isTimeoutError(error: unknown): boolean {
   return error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError");
+}
+
+function safeEvidenceLabel(fileName: string): string {
+  return fileName.replace(/[\r\n\t]/g, " ").slice(0, 120) || "screenshot";
 }
 
 function extractOutputText(response: GeminiResponse): string {
