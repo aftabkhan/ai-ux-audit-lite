@@ -3,10 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuditForm } from "@/components/audit-form/AuditForm";
 
 describe("AuditForm screenshot controls", () => {
-  const createObjectURL = vi.fn(() => "blob:preview");
+  let previewCounter = 0;
+  const createObjectURL = vi.fn(() => `blob:preview-${++previewCounter}`);
   const revokeObjectURL = vi.fn();
 
   beforeEach(() => {
+    previewCounter = 0;
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
       callback(0);
       return 1;
@@ -29,58 +31,72 @@ describe("AuditForm screenshot controls", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows a preview and lets the user remove a valid screenshot", () => {
+  it("shows ordered evidence previews and lets the user remove one screenshot", () => {
     render(<AuditForm />);
 
-    const input = screen.getByLabelText(/^Choose screenshot/) as HTMLInputElement;
-    const screenshot = new File(["image-data"], "checkout.png", { type: "image/png" });
+    const input = screen.getByLabelText(/^Choose screenshots/) as HTMLInputElement;
+    const first = new File(["first"], "cart.png", { type: "image/png" });
+    const second = new File(["second"], "checkout.webp", { type: "image/webp" });
 
-    fireEvent.change(input, { target: { files: [screenshot] } });
+    fireEvent.change(input, { target: { files: [first, second] } });
 
-    expect(screen.getByAltText("Preview of checkout.png")).toHaveAttribute("src", "blob:preview");
-    expect(screen.getByText("checkout.png")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Remove screenshot" })).toBeInTheDocument();
-    expect(screen.getByText("Replace screenshot")).toBeInTheDocument();
+    expect(screen.getByAltText("Preview of evidence 1: cart.png")).toHaveAttribute("src", "blob:preview-1");
+    expect(screen.getByAltText("Preview of evidence 2: checkout.webp")).toHaveAttribute("src", "blob:preview-2");
+    expect(screen.getByText("Evidence 1 · cart.png")).toBeInTheDocument();
+    expect(screen.getByText("Evidence 2 · checkout.webp")).toBeInTheDocument();
+    expect(screen.getByText("Replace evidence")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Remove screenshot" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove evidence 1" }));
 
-    expect(screen.queryByAltText("Preview of checkout.png")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Remove screenshot" })).not.toBeInTheDocument();
-    expect(screen.getByText("Choose screenshot")).toBeInTheDocument();
+    expect(screen.queryByAltText("Preview of evidence 1: cart.png")).not.toBeInTheDocument();
+    expect(screen.getByText("Evidence 1 · checkout.webp")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Screenshot removed. Choose another screenshot when you are ready.",
+      "Screenshot removed. Remaining evidence is still ready to review.",
     );
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview");
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview-1");
   });
 
-  it("keeps context fields intact when a screenshot is removed", () => {
+  it("keeps context fields intact when evidence is removed", () => {
     render(<AuditForm />);
 
-    fireEvent.change(screen.getByLabelText("Screen title"), {
-      target: { value: "Checkout payment step" },
+    fireEvent.change(screen.getByLabelText("Audit / screen title"), {
+      target: { value: "Checkout payment flow" },
     });
     fireEvent.change(screen.getByLabelText("Target user"), {
       target: { value: "First-time customer" },
     });
 
     const screenshot = new File(["image-data"], "checkout.webp", { type: "image/webp" });
-    fireEvent.change(screen.getByLabelText(/^Choose screenshot/), {
+    fireEvent.change(screen.getByLabelText(/^Choose screenshots/), {
       target: { files: [screenshot] },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Remove screenshot" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove evidence 1" }));
 
-    expect(screen.getByLabelText("Screen title")).toHaveValue("Checkout payment step");
+    expect(screen.getByLabelText("Audit / screen title")).toHaveValue("Checkout payment flow");
     expect(screen.getByLabelText("Target user")).toHaveValue("First-time customer");
   });
 
-  it("reports an accessible error when audit is submitted without a screenshot", () => {
+  it("rejects more than eight screenshots before submission", () => {
+    render(<AuditForm />);
+
+    const screenshots = Array.from({ length: 9 }, (_, index) =>
+      new File([`screen-${index}`], `screen-${index}.png`, { type: "image/png" }),
+    );
+    fireEvent.change(screen.getByLabelText(/^Choose screenshots/), {
+      target: { files: screenshots },
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Choose no more than 8 screenshots");
+  });
+
+  it("reports an accessible error when audit is submitted without evidence", () => {
     render(<AuditForm />);
 
     fireEvent.click(screen.getByRole("button", { name: "Run UX audit" }));
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "Add a screenshot before starting the audit.",
+      "Add at least one screenshot before starting the audit.",
     );
-    expect(screen.getByLabelText(/^Choose screenshot/)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText(/^Choose screenshots/)).toHaveAttribute("aria-invalid", "true");
   });
 });
