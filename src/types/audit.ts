@@ -80,6 +80,7 @@ export interface AuditError {
   | "FILE_TOO_LARGE"
   | "INVALID_REQUEST"
   | "RATE_LIMITED"
+  | "PROVIDER_TIMEOUT"
   | "PROVIDER_ERROR"
   | "INVALID_RESPONSE"
   | "UNKNOWN_ERROR";
