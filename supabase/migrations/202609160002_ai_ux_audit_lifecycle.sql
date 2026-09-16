@@ -15,13 +15,14 @@ create table if not exists public.ai_ux_audits (
   finalized_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  unique (id, reviewer_id),
   check ((status = 'archived') = (archived_at is not null)),
   check (finalized_at is null or finalized_at >= created_at)
 );
 
 create table if not exists public.ai_ux_audit_evidence (
   id uuid primary key default gen_random_uuid(),
-  audit_id uuid not null references public.ai_ux_audits(id) on delete cascade,
+  audit_id uuid not null,
   reviewer_id uuid not null references public.product_lab_reviewers(id) on delete cascade,
   evidence_type text not null check (evidence_type = 'screenshot'),
   label text not null check (char_length(label) between 1 and 160),
@@ -31,12 +32,13 @@ create table if not exists public.ai_ux_audit_evidence (
   byte_size integer not null check (byte_size > 0 and byte_size <= 5242880),
   created_at timestamptz not null default now(),
   unique (audit_id, sequence_index),
-  unique (object_key)
+  unique (object_key),
+  foreign key (audit_id, reviewer_id) references public.ai_ux_audits(id, reviewer_id) on delete cascade
 );
 
 create table if not exists public.ai_ux_audit_runs (
   id uuid primary key default gen_random_uuid(),
-  audit_id uuid not null references public.ai_ux_audits(id) on delete cascade,
+  audit_id uuid not null,
   reviewer_id uuid not null references public.product_lab_reviewers(id) on delete cascade,
   provider text not null check (char_length(provider) between 1 and 80),
   model text,
@@ -44,13 +46,15 @@ create table if not exists public.ai_ux_audit_runs (
   summary jsonb not null,
   generated_at timestamptz not null,
   created_at timestamptz not null default now(),
+  unique (id, reviewer_id),
+  foreign key (audit_id, reviewer_id) references public.ai_ux_audits(id, reviewer_id) on delete cascade,
   check (jsonb_typeof(summary) = 'object')
 );
 
 create table if not exists public.ai_ux_audit_findings (
   id uuid primary key default gen_random_uuid(),
-  run_id uuid not null references public.ai_ux_audit_runs(id) on delete cascade,
-  audit_id uuid not null references public.ai_ux_audits(id) on delete cascade,
+  run_id uuid not null,
+  audit_id uuid not null,
   reviewer_id uuid not null references public.product_lab_reviewers(id) on delete cascade,
   source_finding_id text not null check (char_length(source_finding_id) between 1 and 160),
   title text not null check (char_length(title) between 1 and 240),
@@ -67,12 +71,15 @@ create table if not exists public.ai_ux_audit_findings (
   confidence text not null check (confidence in ('high','medium','low')),
   evidence_ids uuid[] not null default '{}',
   created_at timestamptz not null default now(),
-  unique (run_id, source_finding_id)
+  unique (run_id, source_finding_id),
+  unique (id, reviewer_id),
+  foreign key (audit_id, reviewer_id) references public.ai_ux_audits(id, reviewer_id) on delete cascade,
+  foreign key (run_id, reviewer_id) references public.ai_ux_audit_runs(id, reviewer_id) on delete cascade
 );
 
 create table if not exists public.ai_ux_audit_reviews (
-  finding_id uuid primary key references public.ai_ux_audit_findings(id) on delete cascade,
-  audit_id uuid not null references public.ai_ux_audits(id) on delete cascade,
+  finding_id uuid primary key,
+  audit_id uuid not null,
   reviewer_id uuid not null references public.product_lab_reviewers(id) on delete cascade,
   status text not null default 'unreviewed' check (status in ('unreviewed','accepted','dismissed')),
   severity_override text check (severity_override is null or severity_override in ('critical','high','medium','low')),
@@ -80,18 +87,21 @@ create table if not exists public.ai_ux_audit_reviews (
   approved_recommendation text check (approved_recommendation is null or char_length(approved_recommendation) <= 4000),
   reviewed_at timestamptz,
   updated_at timestamptz not null default now(),
+  foreign key (finding_id, reviewer_id) references public.ai_ux_audit_findings(id, reviewer_id) on delete cascade,
+  foreign key (audit_id, reviewer_id) references public.ai_ux_audits(id, reviewer_id) on delete cascade,
   check ((status = 'unreviewed') = (reviewed_at is null))
 );
 
 create table if not exists public.ai_ux_audit_versions (
   id uuid primary key default gen_random_uuid(),
-  audit_id uuid not null references public.ai_ux_audits(id) on delete cascade,
+  audit_id uuid not null,
   reviewer_id uuid not null references public.product_lab_reviewers(id) on delete cascade,
   version_number integer not null check (version_number > 0),
   label text not null check (char_length(label) between 1 and 160),
   snapshot jsonb not null,
   created_at timestamptz not null default now(),
   unique (audit_id, version_number),
+  foreign key (audit_id, reviewer_id) references public.ai_ux_audits(id, reviewer_id) on delete cascade,
   check (jsonb_typeof(snapshot) = 'object')
 );
 
@@ -122,6 +132,7 @@ on conflict (id) do nothing;
 -- No browser database or storage policies are intentionally created. The product server uses
 -- the service role only after validating the Product Lab session and the `ai-ux-audit` grant.
 -- Every query and object-storage operation must additionally scope ownership from reviewer_id
--- in that trusted context. This migration requires the Product Lab foundation migration first.
+-- in that trusted context. Composite foreign keys defend against cross-reviewer relationships
+-- even if application code regresses. This migration requires the Product Lab foundation first.
 
 commit;
