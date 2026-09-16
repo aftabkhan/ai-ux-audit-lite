@@ -23,8 +23,12 @@ function createToken(): string {
   return randomBytes(32).toString("base64url");
 }
 
+export function productLabProtectionEnabled(): boolean {
+  return process.env.NODE_ENV === "production" || process.env.PRODUCT_LAB_PROTECTED === "true";
+}
+
 function getConfig(): { baseUrl: string; serviceKey: string } | null {
-  if (process.env.PRODUCT_LAB_PROTECTED !== "true") return null;
+  if (!productLabProtectionEnabled()) return null;
 
   const baseUrl = process.env.PRODUCT_LAB_BASE_URL?.trim().replace(/\/$/, "");
   const serviceKey = process.env.PRODUCT_LAB_INTERNAL_SERVICE_KEY?.trim();
@@ -75,10 +79,6 @@ async function callLab(path: string, body: Record<string, unknown>): Promise<Pro
 
   if (!response.ok) return null;
   return parseIdentity(await response.json());
-}
-
-export function productLabProtectionEnabled(): boolean {
-  return process.env.PRODUCT_LAB_PROTECTED === "true";
 }
 
 export function productLabPortalUrl(): string {
