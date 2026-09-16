@@ -4,6 +4,7 @@ import {
   auditDefinitionUpdateSchema,
   humanReviewUpdateSchema,
 } from "@/lib/audit/lifecycle-schema";
+import { removeEvidenceObjects } from "@/lib/audit/evidence-storage";
 
 interface AuditRow {
   id: string;
@@ -44,6 +45,11 @@ interface ReviewRow {
   approved_recommendation: string | null;
   reviewed_at: string | null;
   updated_at: string;
+}
+
+interface DeletionPreparationRow {
+  deletion_job_id: string;
+  object_keys: string[];
 }
 
 function config() {
@@ -250,9 +256,33 @@ export async function restoreAudit(context: ProductLabAuditContext, auditId: str
 
 export async function deleteAudit(context: ProductLabAuditContext, auditId: string): Promise<boolean> {
   assertAuditContext(context);
-  const rows = await request<Array<{ id: string }>>(
-    `/rest/v1/ai_ux_audits?id=${eq(auditId)}&reviewer_id=${eq(context.reviewerId)}`,
-    { method: "DELETE", headers: { Prefer: "return=representation" } },
-  );
-  return rows.length === 1;
+  const prepared = await request<DeletionPreparationRow[]>("/rest/v1/rpc/prepare_ai_ux_audit_deletion", {
+    method: "POST",
+    body: JSON.stringify({ p_audit_id: auditId, p_reviewer_id: context.reviewerId }),
+  });
+  if (prepared.length !== 1) throw new Error("Audit deletion returned an unexpected result.");
+
+  const job = prepared[0];
+  try {
+    await removeEvidenceObjects(job.object_keys);
+    const now = new Date().toISOString();
+    await request<void>(`/rest/v1/ai_ux_audit_deletion_jobs?id=${eq(job.deletion_job_id)}&reviewer_id=${eq(context.reviewerId)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ status: "completed", completed_at: now, updated_at: now, failure_code: null }),
+    });
+    return true;
+  } catch (error) {
+    await request<void>(`/rest/v1/ai_ux_audit_deletion_jobs?id=${eq(job.deletion_job_id)}&reviewer_id=${eq(context.reviewerId)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        status: "failed",
+        failure_code: "STORAGE_DELETE_FAILED",
+        completed_at: null,
+        updated_at: new Date().toISOString(),
+      }),
+    }).catch(() => undefined);
+    throw error;
+  }
 }
