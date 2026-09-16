@@ -227,10 +227,10 @@ export function AuditForm() {
               {evidence.map(({ file, url }, index) => (
                 <figure className="preview-card" key={`${file.name}-${file.size}-${index}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt={`Preview of evidence ${index + 1}: ${file.name}`} />
+                  <img src={url} alt={`Preview of evidence ${index + 1}`} />
                   <figcaption>
                     <div>
-                      <strong>Evidence {index + 1} · {file.name}</strong>
+                      <strong>Evidence {index + 1}</strong>
                       <span>{Math.ceil(file.size / 1024)} KB · Ready to review</span>
                     </div>
                     <button className="secondary-button" type="button" onClick={() => removeScreenshot(index)} disabled={isSubmitting}>
