@@ -56,10 +56,10 @@ describe("AuditForm screenshot controls", () => {
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview-1");
   });
 
-  it("keeps context fields intact when evidence is removed", () => {
+  it("keeps audit-definition fields intact when evidence is removed", () => {
     render(<AuditForm />);
 
-    fireEvent.change(screen.getByLabelText("Audit / screen title"), {
+    fireEvent.change(screen.getByLabelText("Audit title"), {
       target: { value: "Checkout payment flow" },
     });
     fireEvent.change(screen.getByLabelText("Target user"), {
@@ -72,7 +72,7 @@ describe("AuditForm screenshot controls", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Remove evidence 1" }));
 
-    expect(screen.getByLabelText("Audit / screen title")).toHaveValue("Checkout payment flow");
+    expect(screen.getByLabelText("Audit title")).toHaveValue("Checkout payment flow");
     expect(screen.getByLabelText("Target user")).toHaveValue("First-time customer");
   });
 
