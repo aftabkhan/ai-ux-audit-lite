@@ -2,11 +2,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { OpenAIAuditProvider } from "@/lib/ai/openai-provider";
 
 const input = {
-  image: {
-    bytes: new Uint8Array([1, 2, 3]),
-    mimeType: "image/png" as const,
-    fileName: "screen.png",
-  },
+  images: [
+    {
+      bytes: new Uint8Array([1, 2, 3]),
+      mimeType: "image/png" as const,
+      fileName: "screen-1.png",
+      sequenceIndex: 0,
+    },
+    {
+      bytes: new Uint8Array([4, 5, 6]),
+      mimeType: "image/jpeg" as const,
+      fileName: "screen-2.jpg",
+      sequenceIndex: 1,
+    },
+  ],
   context: { screenTitle: "Checkout" },
 };
 
@@ -36,7 +45,7 @@ afterEach(() => {
 });
 
 describe("OpenAIAuditProvider", () => {
-  it("returns a validated audit from a server-side response", async () => {
+  it("returns a validated audit from ordered server-side evidence", async () => {
     process.env.OPENAI_API_KEY = "test-key";
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ output_text: JSON.stringify(payload) }), {
@@ -54,7 +63,10 @@ describe("OpenAIAuditProvider", () => {
     expect(request.headers).toMatchObject({ Authorization: "Bearer test-key" });
     const body = JSON.parse(String(request.body));
     expect(body.store).toBe(false);
-    expect(body.input[0].content[1].image_url).toContain("data:image/png;base64,AQID");
+    expect(body.input[0].content[1].text).toContain("Evidence 1 of 2");
+    expect(body.input[0].content[2].image_url).toContain("data:image/png;base64,AQID");
+    expect(body.input[0].content[3].text).toContain("Evidence 2 of 2");
+    expect(body.input[0].content[4].image_url).toContain("data:image/jpeg;base64,BAUG");
   });
 
   it("maps provider timeout to a recoverable 504 error", async () => {
