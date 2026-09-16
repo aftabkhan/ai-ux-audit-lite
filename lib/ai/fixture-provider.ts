@@ -32,6 +32,7 @@ export class FixtureAuditProvider implements AuditProvider {
           impact: "Users may hesitate if several actions appear equally important.",
           recommendation: "Use size, position, contrast, and spacing to establish one clear next action.",
           confidence: "low",
+          evidenceRefs: [1],
         },
         {
           id: "fixture-accessibility",
@@ -42,6 +43,7 @@ export class FixtureAuditProvider implements AuditProvider {
           impact: "Accessibility barriers may prevent people from understanding or completing the task.",
           recommendation: "Run keyboard, screen-reader, zoom, and contrast checks with the implemented interface.",
           confidence: "high",
+          evidenceRefs: [1],
         },
       ],
       disclaimer: "Development fixture only. This response is not generated from screenshot analysis and is not a formal UX or accessibility audit.",
