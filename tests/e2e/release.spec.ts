@@ -33,7 +33,7 @@ test("landing page has no horizontal overflow and no serious accessibility viola
 test("ordered evidence can be previewed, selectively removed, and selected again without losing context", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByLabel("Audit / screen title").fill("Checkout payment flow");
+  await page.getByLabel("Audit title").fill("Checkout payment flow");
   await page.getByLabel("Target user").fill("First-time customer");
   await page.getByLabel("Product context").fill("Customer moves from cart to payment confirmation.");
 
@@ -49,7 +49,7 @@ test("ordered evidence can be previewed, selectively removed, and selected again
   await page.getByRole("button", { name: "Remove evidence 1" }).click();
   await expect(page.getByRole("status")).toContainText("Screenshot removed");
   await expect(page.getByText("Evidence 1 · checkout.png")).toBeVisible();
-  await expect(page.getByLabel("Audit / screen title")).toHaveValue("Checkout payment flow");
+  await expect(page.getByLabel("Audit title")).toHaveValue("Checkout payment flow");
   await expect(page.getByLabel("Target user")).toHaveValue("First-time customer");
   await expect(page.getByLabel("Product context")).toHaveValue("Customer moves from cart to payment confirmation.");
   await expect(page.getByLabel(/^Choose screenshots/)).toBeFocused();
@@ -85,7 +85,7 @@ test("fixture audit completes from multiple evidence items, focuses results, fil
     { name: "cart.png", mimeType: "image/png", buffer: onePixelPng },
     { name: "checkout.png", mimeType: "image/png", buffer: onePixelPng },
   ]);
-  await page.getByLabel("Audit / screen title").fill("Checkout flow");
+  await page.getByLabel("Audit title").fill("Checkout flow");
   await page.getByRole("button", { name: "Run UX audit" }).click();
 
   const resultsHeading = page.getByRole("heading", { name: "UX review results" });
@@ -101,6 +101,6 @@ test("fixture audit completes from multiple evidence items, focuses results, fil
 
   await page.getByRole("button", { name: /new review/i }).click();
   await expect(page.getByRole("heading", { name: "Add interface evidence" })).toBeVisible();
-  await expect(page.getByLabel("Audit / screen title")).toHaveValue("");
+  await expect(page.getByLabel("Audit title")).toHaveValue("");
   await expect(page.getByLabel(/^Choose screenshots/)).toBeFocused();
 });
