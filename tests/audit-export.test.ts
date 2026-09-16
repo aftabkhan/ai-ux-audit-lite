@@ -7,7 +7,12 @@ const result: AuditResult = {
   generatedAt: "2026-08-02T12:00:00.000Z",
   context: {
     screenTitle: "Checkout",
+    scopeType: "user-flow",
     targetUser: "First-time buyer",
+    taskDescription: "Complete checkout from cart to confirmation",
+    businessObjective: "Reduce abandonment",
+    expectedOutcome: "Complete payment confidently",
+    productContext: "Mobile commerce checkout",
   },
   summary: {
     overview: "A focused first-pass review.",
@@ -24,17 +29,26 @@ const result: AuditResult = {
       impact: "Users may hesitate.",
       recommendation: "Strengthen the primary action.",
       confidence: "medium",
+      evidenceRefs: [1, 2],
     },
   ],
   disclaimer: "AI-assisted first-pass review only.",
 };
 
 describe("auditToMarkdown", () => {
-  it("creates a readable report with context and findings", () => {
+  it("creates a readable report with full audit definition and evidence provenance", () => {
     const markdown = auditToMarkdown(result);
 
     expect(markdown).toContain("# AI UX Audit Lite Report");
-    expect(markdown).toContain("- Screen: Checkout");
+    expect(markdown).toContain("## Audit Definition");
+    expect(markdown).toContain("- Audit title: Checkout");
+    expect(markdown).toContain("- Scope: User Flow");
+    expect(markdown).toContain("- Target user: First-time buyer");
+    expect(markdown).toContain("- Task: Complete checkout from cart to confirmation");
+    expect(markdown).toContain("- Business objective: Reduce abandonment");
+    expect(markdown).toContain("- Expected outcome: Complete payment confidently");
+    expect(markdown).toContain("- Product context: Mobile commerce checkout");
+    expect(markdown).toContain("- Evidence: Evidence 1, Evidence 2");
     expect(markdown).toContain("## Findings");
     expect(markdown).toContain("Primary action needs emphasis");
     expect(markdown).toContain(result.disclaimer);
@@ -81,6 +95,7 @@ describe("auditToMarkdown", () => {
           impact: "Low vision users may struggle.",
           recommendation: "Increase contrast to 4.5:1.",
           confidence: "high",
+          evidenceRefs: [2],
         },
       ],
     };
@@ -104,7 +119,7 @@ describe("auditToMarkdown", () => {
     expect(markdown).toContain("[DISMISSED]");
   });
 
-  it("handles JSON export structure with aiBaseline, humanReview, and conditional completedAt", () => {
+  it("handles JSON export structure with aiBaseline and humanReview", () => {
     let exportedBlobContent = "";
 
     class MockBlob extends Blob {
@@ -125,7 +140,6 @@ describe("auditToMarkdown", () => {
     HTMLAnchorElement.prototype.click = () => {};
 
     try {
-      // Test incomplete review: reviewStatus = "in-progress"
       const inProgressSummary = {
         totalCount: 2,
         reviewedCount: 1,
@@ -142,11 +156,11 @@ describe("auditToMarkdown", () => {
       const parsedInProgress = JSON.parse(exportedBlobContent);
 
       expect(parsedInProgress.aiBaseline).toBeDefined();
+      expect(parsedInProgress.aiBaseline.findings[0].evidenceRefs).toEqual([1, 2]);
       expect(parsedInProgress.humanReview.status).toBe("in-progress");
       expect(parsedInProgress.humanReview.exportedAt).toBeDefined();
       expect(parsedInProgress.humanReview.completedAt).toBeUndefined();
 
-      // Test completed review: reviewStatus = "completed"
       const completedSummary = {
         ...inProgressSummary,
         reviewedCount: 2,
