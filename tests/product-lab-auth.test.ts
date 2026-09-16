@@ -27,10 +27,17 @@ describe("Product Lab audit API boundary", () => {
     await expect(response.json()).resolves.toMatchObject({ code: "ACCESS_REQUIRED" });
   });
 
-  it("preserves the existing request validation path when protection is disabled", async () => {
+  it("preserves the existing multipart validation path when protection is disabled", async () => {
     auth.protected.mockReturnValue(false);
+    const formData = new FormData();
 
-    const response = await POST(new Request("http://localhost/api/audit", { method: "POST" }));
+    const response = await POST(
+      new Request("http://localhost/api/audit", {
+        method: "POST",
+        body: formData,
+      }),
+    );
+
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ code: "INVALID_REQUEST" });
     expect(auth.identity).not.toHaveBeenCalled();
