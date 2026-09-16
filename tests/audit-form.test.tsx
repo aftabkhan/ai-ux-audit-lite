@@ -40,16 +40,17 @@ describe("AuditForm screenshot controls", () => {
 
     fireEvent.change(input, { target: { files: [first, second] } });
 
-    expect(screen.getByAltText("Preview of evidence 1: cart.png")).toHaveAttribute("src", "blob:preview-1");
-    expect(screen.getByAltText("Preview of evidence 2: checkout.webp")).toHaveAttribute("src", "blob:preview-2");
-    expect(screen.getByText("Evidence 1 · cart.png")).toBeInTheDocument();
-    expect(screen.getByText("Evidence 2 · checkout.webp")).toBeInTheDocument();
+    expect(screen.getByAltText("Preview of evidence 1")).toHaveAttribute("src", "blob:preview-1");
+    expect(screen.getByAltText("Preview of evidence 2")).toHaveAttribute("src", "blob:preview-2");
+    expect(screen.getByText("Evidence 1")).toBeInTheDocument();
+    expect(screen.getByText("Evidence 2")).toBeInTheDocument();
     expect(screen.getByText("Replace evidence")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Remove evidence 1" }));
 
-    expect(screen.queryByAltText("Preview of evidence 1: cart.png")).not.toBeInTheDocument();
-    expect(screen.getByText("Evidence 1 · checkout.webp")).toBeInTheDocument();
+    expect(screen.queryByAltText("Preview of evidence 2")).not.toBeInTheDocument();
+    expect(screen.getByAltText("Preview of evidence 1")).toHaveAttribute("src", "blob:preview-2");
+    expect(screen.getByText("Evidence 1")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent(
       "Screenshot removed. Remaining evidence is still ready to review.",
     );
