@@ -107,7 +107,7 @@ export async function uploadAuditEvidence(
         "x-upsert": "false",
         "Cache-Control": "no-store",
       }),
-      body: input.bytes,
+      body: Buffer.from(input.bytes),
       cache: "no-store",
     },
   );
