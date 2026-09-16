@@ -42,10 +42,16 @@ export interface AuditTriageSummary {
 export const CONFIDENCE_LEVELS = ["high", "medium", "low"] as const;
 export type ConfidenceLevel = (typeof CONFIDENCE_LEVELS)[number];
 
+export type AuditScopeType = "single-screen" | "multi-screen" | "user-flow" | "page-sequence" | "product-workflow";
+
 export interface AuditContext {
   screenTitle?: string;
+  scopeType?: AuditScopeType;
   productContext?: string;
   targetUser?: string;
+  taskDescription?: string;
+  businessObjective?: string;
+  expectedOutcome?: string;
 }
 
 export interface AuditFinding {
@@ -57,6 +63,8 @@ export interface AuditFinding {
   impact: string;
   recommendation: string;
   confidence: ConfidenceLevel;
+  /** 1-based positions in the submitted ordered evidence sequence. */
+  evidenceRefs?: number[];
 }
 
 export interface AuditSummary {
