@@ -2,15 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { compareAuditVersions, createAuditVersion, type PersistedAuditVersion } from "@/lib/audit/versioning";
 
 const context = {
-  reviewerId: "11111111-1111-1111-1111-111111111111",
-  sessionId: "22222222-2222-2222-2222-222222222222",
+  reviewerId: "11111111-1111-4111-8111-111111111111",
+  sessionId: "22222222-2222-4222-8222-222222222222",
   productKey: "ai-ux-audit" as const,
   expiresAt: "2099-01-01T00:00:00.000Z",
 };
-const auditId = "33333333-3333-3333-3333-333333333333";
-const findingId = "44444444-4444-4444-4444-444444444444";
-const runId = "55555555-5555-5555-5555-555555555555";
-const versionId = "66666666-6666-6666-6666-666666666666";
+const auditId = "33333333-3333-4333-8333-333333333333";
+const findingId = "44444444-4444-4444-8444-444444444444";
+const runId = "55555555-5555-4555-8555-555555555555";
+const versionId = "66666666-6666-4666-8666-666666666666";
 
 beforeEach(() => {
   process.env.SUPABASE_URL = "https://example.supabase.co";
