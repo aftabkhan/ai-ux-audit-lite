@@ -1,25 +1,18 @@
 import { z } from "zod";
+import {
+  AUDIT_CATEGORIES,
+  LEGACY_AUDIT_CATEGORIES,
+} from "@/src/types/audit";
+import { AUDIT_SCOPE_TYPES } from "@/src/types/audit-lifecycle";
 
 export const auditCategorySchema = z.enum([
-  "visual-hierarchy",
-  "navigation-orientation",
-  "clarity-of-actions",
-  "consistency",
-  "readability",
-  "feedback-system-status",
-  "error-prevention-recovery",
-  "accessibility-basics",
+  ...AUDIT_CATEGORIES,
+  ...LEGACY_AUDIT_CATEGORIES,
 ]);
 
 export const severitySchema = z.enum(["critical", "high", "medium", "low"]);
 export const confidenceSchema = z.enum(["high", "medium", "low"]);
-export const auditScopeTypeSchema = z.enum([
-  "single-screen",
-  "multi-screen",
-  "user-flow",
-  "page-sequence",
-  "product-workflow",
-]);
+export const auditScopeTypeSchema = z.enum(AUDIT_SCOPE_TYPES);
 
 export const auditContextSchema = z.object({
   screenTitle: z.string().trim().max(160).optional(),
