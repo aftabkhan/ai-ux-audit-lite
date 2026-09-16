@@ -73,7 +73,11 @@ function toVersion(row: VersionRow): PersistedAuditVersion {
   if (!row.id || !row.audit_id || !row.reviewer_id || !Number.isInteger(row.version_number) || row.version_number < 1) {
     throw new Error("Audit version storage returned invalid metadata.");
   }
-  const snapshot = auditVersionSnapshotSchema.parse(row.snapshot);
+  const parsed = auditVersionSnapshotSchema.parse(row.snapshot);
+  const snapshot: AuditVersionSnapshot = {
+    ...parsed,
+    runId: parsed.runId ?? undefined,
+  };
   return {
     id: row.id,
     auditId: row.audit_id,
