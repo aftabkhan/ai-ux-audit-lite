@@ -32,8 +32,22 @@ export class OpenAIAuditProvider implements AuditProvider {
       );
     }
 
+    if (input.images.length === 0) {
+      throw new AuditServiceError("INVALID_REQUEST", "At least one screenshot is required.", 400);
+    }
+
     const model = process.env.OPENAI_AUDIT_MODEL ?? "gpt-5";
-    const imageUrl = `data:${input.image.mimeType};base64,${Buffer.from(input.image.bytes).toString("base64")}`;
+    const evidenceContent = input.images.flatMap((image, index) => [
+      {
+        type: "input_text",
+        text: `Evidence ${index + 1} of ${input.images.length}: ${safeEvidenceLabel(image.fileName)}`,
+      },
+      {
+        type: "input_image",
+        image_url: `data:${image.mimeType};base64,${Buffer.from(image.bytes).toString("base64")}`,
+        detail: "high",
+      },
+    ]);
 
     let response: Response;
     try {
@@ -50,8 +64,8 @@ export class OpenAIAuditProvider implements AuditProvider {
             {
               role: "user",
               content: [
-                { type: "input_text", text: buildAuditPrompt(input.context) },
-                { type: "input_image", image_url: imageUrl, detail: "high" },
+                { type: "input_text", text: buildAuditPrompt(input.context, input.images.length) },
+                ...evidenceContent,
               ],
             },
           ],
@@ -100,7 +114,7 @@ export class OpenAIAuditProvider implements AuditProvider {
       },
       findings: parsed.findings,
       disclaimer:
-        "AI-generated first-pass UX review based on one screenshot and the context provided. Validate findings through user research, accessibility testing, analytics, and expert review before making product decisions.",
+        "AI-generated first-pass UX review based on the supplied screenshot evidence and context. Validate findings through user research, accessibility testing, analytics, and expert review before making product decisions.",
     };
 
     const validated = auditResultSchema.safeParse(result);
@@ -120,6 +134,10 @@ export class OpenAIAuditProvider implements AuditProvider {
 
 function isTimeoutError(error: unknown): boolean {
   return error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError");
+}
+
+function safeEvidenceLabel(fileName: string): string {
+  return fileName.replace(/[\r\n\t]/g, " ").slice(0, 120) || "screenshot";
 }
 
 function extractOutputText(response: OpenAIResponse): string {
