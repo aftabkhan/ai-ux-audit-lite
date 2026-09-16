@@ -2,7 +2,7 @@
 
 A focused public portfolio product demonstrating AI-assisted UX analysis, human-in-the-loop review, accessibility-aware product thinking, and structured UX engineering.
 
-> Status: active product / public portfolio candidate. The product is not a formal accessibility certification or compliance tool.
+> Status: active product / public portfolio candidate. Production access is invitation-only through Product Lab. The product is not a formal accessibility certification or compliance tool.
 
 ## Product direction
 
