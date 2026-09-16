@@ -3,7 +3,11 @@ import type { AuditContext } from "@/src/types/audit";
 export function buildAuditPrompt(context: AuditContext, evidenceCount = 1): string {
   const contextLines = [
     context.screenTitle ? `Audit title / screen title: ${context.screenTitle}` : null,
+    context.scopeType ? `Audit scope: ${context.scopeType}` : null,
     context.targetUser ? `Target user: ${context.targetUser}` : null,
+    context.taskDescription ? `Task description: ${context.taskDescription}` : null,
+    context.businessObjective ? `Business objective: ${context.businessObjective}` : null,
+    context.expectedOutcome ? `Expected user outcome: ${context.expectedOutcome}` : null,
     context.productContext ? `Product context: ${context.productContext}` : null,
   ].filter(Boolean);
 
@@ -18,8 +22,9 @@ Analyze only what is visible in the supplied evidence and what is supported by t
 When multiple screenshots are supplied:
 - compare continuity, hierarchy, navigation, labels, feedback and task progression across the sequence;
 - identify cross-screen inconsistency or workflow friction only when evidence supports it;
-- refer to evidence positions such as "Evidence 1" or "Evidence 2" in observations where useful;
 - never claim behavior that is not visible in the sequence.
+
+Every finding must identify the 1-based evidence positions that support it in evidenceRefs. Use only integers from 1 through ${evidenceCount}. If a finding is supported by more than one screenshot, include each relevant position. Do not cite evidence that does not support the observation.
 
 Review the interface evidence across these eight currently supported lenses:
 1. visual-hierarchy
@@ -44,10 +49,11 @@ Return valid JSON only. Do not wrap it in markdown. Use this exact structure:
       "title": "concise finding title",
       "severity": "high|medium|low",
       "category": "one of the eight lens identifiers",
-      "observation": "specific evidence-grounded observation; identify evidence position when useful",
+      "observation": "specific evidence-grounded observation",
       "impact": "likely user or business impact stated cautiously",
       "recommendation": "specific and actionable improvement",
-      "confidence": "high|medium|low"
+      "confidence": "high|medium|low",
+      "evidenceRefs": [1]
     }
   ]
 }
