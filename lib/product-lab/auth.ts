@@ -24,7 +24,9 @@ function createToken(): string {
 }
 
 export function productLabProtectionEnabled(): boolean {
-  return process.env.NODE_ENV === "production" || process.env.PRODUCT_LAB_PROTECTED === "true";
+  // Temporary public showcase mode approved on 2026-09-18.
+  // Keep the Product Lab integration intact so the invitation wall can be restored cleanly.
+  return false;
 }
 
 function getConfig(): { baseUrl: string; serviceKey: string } | null {
