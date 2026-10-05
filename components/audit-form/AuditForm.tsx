@@ -50,6 +50,7 @@ export function AuditForm() {
   const previewUrlsRef = useRef<string[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
   const [model, setModel] = useState("");
+  const [extendedThinking, setExtendedThinking] = useState(false);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [apiError, setApiError] = useState<AuditError | null>(null);
   const [status, setStatus] = useState<string>("");
@@ -129,7 +130,7 @@ export function AuditForm() {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
-  async function runAudit(selectedModel = model) {
+  async function runAudit(selectedModel = model, selectedThinking = extendedThinking) {
     if (evidence.length === 0) {
       setFileError("Add at least one screenshot before starting the audit.");
       document.getElementById(fileInputId)?.focus();
@@ -149,6 +150,7 @@ export function AuditForm() {
     const body = new FormData();
     evidence.forEach(({ file }) => body.append("screenshot", file));
     if (selectedModel) body.set("model", selectedModel);
+    if (selectedModel || selectedThinking) body.set("extendedThinking", String(selectedThinking));
     body.set("screenTitle", form.screenTitle);
     body.set("scopeType", form.scopeType);
     body.set("targetUser", form.targetUser);
@@ -310,7 +312,9 @@ export function AuditForm() {
           open={modelPickerOpen}
           onOpenChange={setModelPickerOpen}
           recoveryMessage={apiError ? `${apiError.message} ${apiError.recovery ?? ""}`.trim() : undefined}
-          onRetry={(nextModel) => { setModel(nextModel); void runAudit(nextModel); }}
+          extendedThinking={extendedThinking}
+          onExtendedThinkingChange={setExtendedThinking}
+          onRetry={(nextModel, nextThinking) => { setModel(nextModel); void runAudit(nextModel, nextThinking ?? extendedThinking); }}
         />
 
         <div className="form-actions">

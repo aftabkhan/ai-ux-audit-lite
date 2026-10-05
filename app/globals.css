@@ -1316,3 +1316,5 @@ footer p {
   color: var(--ws-text);
 }
 .workspace-frame .model-recovery-action:hover { background: rgba(196, 144, 104, 0.18); }
+
+.audit-form:has([data-picker-open="true"]) { overflow: visible; position: relative; z-index: 20; }

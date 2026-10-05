@@ -62,3 +62,17 @@ export function geminiFailureContext(error: { code?: string; message: string; up
   }
   return { message, recovery, model, canChangeModel };
 }
+
+
+export type GeminiThinkingConfig = { thinkingLevel: "low" | "high" } | { thinkingBudget: number };
+
+/** Return thinking parameters supported by the selected Gemini model family. */
+export function geminiThinkingConfig(model: string, extended: boolean): GeminiThinkingConfig | undefined {
+  if (/^gemini-3(?:\.\d+)?-/i.test(model)) {
+    return { thinkingLevel: extended ? "high" : "low" };
+  }
+  if (/^gemini-2\.5-flash(?:-lite)?(?:-|$)/i.test(model)) {
+    return { thinkingBudget: extended ? -1 : 0 };
+  }
+  return undefined;
+}

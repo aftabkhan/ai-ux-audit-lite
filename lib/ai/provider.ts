@@ -11,6 +11,7 @@ export interface AuditProviderInput {
   images: AuditProviderImage[];
   context: AuditContext;
   model?: string;
+  extendedThinking?: boolean;
 }
 
 export interface AuditProvider {

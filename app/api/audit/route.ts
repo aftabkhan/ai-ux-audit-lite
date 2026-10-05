@@ -118,6 +118,11 @@ export async function POST(request: Request) {
       );
     }
 
+    const thinkingValue = formData.get("extendedThinking");
+    if (formData.getAll("extendedThinking").length > 1 || (thinkingValue !== null && typeof thinkingValue !== "string") || (thinkingValue !== null && thinkingValue !== "true" && thinkingValue !== "false")) {
+      throw new AuditServiceError("INVALID_REQUEST", "Choose a valid thinking setting.", 400);
+    }
+    const extendedThinking = thinkingValue === null ? undefined : thinkingValue === "true";
     const requestedModel = parseGeminiModel(formData.get("model"));
     if (requestedModel === null || formData.getAll("model").length > 1) {
       throw new AuditServiceError("INVALID_REQUEST", "Choose a valid Gemini model or enter a valid model ID.", 400);
@@ -137,7 +142,7 @@ export async function POST(request: Request) {
       })),
     );
 
-    const rawResult = await provider.review({ images, context: parsedContext, model: geminiModel });
+    const rawResult = await provider.review({ images, context: parsedContext, model: geminiModel, extendedThinking });
 
     const result = auditResultSchema.safeParse(rawResult);
     if (!result.success || !findingsReferenceSubmittedEvidence(result.success ? result.data.findings : [], screenshots.length)) {

@@ -5,10 +5,11 @@ import { POST } from "@/app/api/audit/route";
 vi.mock("@/lib/product-lab/auth", () => ({ productLabProtectionEnabled: () => false, getProductLabIdentity: vi.fn() }));
 vi.mock("@/lib/ai/provider-factory", () => ({ getAuditProvider: () => new GeminiAuditProvider() }));
 let requestId = 0;
-async function request(model?: string) {
+async function request(model?: string, extendedThinking = false) {
   const body = new FormData();
   body.append("screenshot", new File([new Uint8Array([1, 2, 3])], "generic.png", { type: "image/png" }));
   if (model) body.set("model", model);
+  if (model || extendedThinking) body.set("extendedThinking", String(extendedThinking));
   const req = new Request("https://example.test/api/audit", { method: "POST", headers: { "x-forwarded-for": `test-${++requestId}` }, body });
   const parsed = await req.formData();
   vi.spyOn(req, "formData").mockResolvedValue(parsed);
@@ -22,9 +23,10 @@ it("returns a validated audit from Gemini", async () => { vi.stubGlobal("fetch",
 it("sends the selected Gemini model and gives model-specific recovery guidance", async () => {
   const fetchMock = vi.fn().mockResolvedValue(new Response("unavailable", { status: 404 }));
   vi.stubGlobal("fetch", fetchMock);
-  const result = await POST(await request("gemini-3.7-flash"));
+  const result = await POST(await request("gemini-3.7-flash", true));
   const body = await result.json();
   expect(new URL(fetchMock.mock.calls[0][0]).pathname).toContain("/models/gemini-3.7-flash:");
+  expect(JSON.parse(fetchMock.mock.calls[0][1].body).generationConfig.thinkingConfig).toEqual({ thinkingLevel: "high" });
   expect(body.model).toBe("gemini-3.7-flash");
   expect(body.canChangeModel).toBe(true);
   expect(body.message).toContain("not available");

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { GEMINI_MODELS, GEMINI_MODEL_PATTERN } from "@/lib/ai/gemini-models";
+import { GEMINI_MODELS, GEMINI_MODEL_PATTERN, geminiThinkingConfig } from "@/lib/ai/gemini-models";
 import styles from "./GeminiModelSelect.module.css";
 
 type Props = {
@@ -12,77 +12,107 @@ type Props = {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   recoveryMessage?: string;
-  onRetry?: (model: string) => void;
+  onRetry?: (model: string, extendedThinking?: boolean) => void;
+  extendedThinking?: boolean;
+  onExtendedThinkingChange?: (enabled: boolean) => void;
 };
 
 function modelName(model: string) {
   return GEMINI_MODELS.find((item) => item.id === model)?.label.replace(/\s\((preview|legacy access)\)$/i, "") || model || "Server default";
 }
 
-export function GeminiModelSelect({ model, onChange, disabled, className, open: controlledOpen, onOpenChange, recoveryMessage, onRetry }: Props) {
+function modelDescription(model: string) {
+  if (/flash-lite/i.test(model)) return "Fastest responses";
+  if (/\bpro\b/i.test(model)) return "Advanced reasoning";
+  if (/flash/i.test(model)) return "Balanced speed and capability";
+  return "Compatible Gemini model";
+}
+
+function supportsThinkingControl(model: string) {
+  return Boolean(model && geminiThinkingConfig(model, false));
+}
+
+export function GeminiModelSelect({
+  model,
+  onChange,
+  disabled,
+  className,
+  open: controlledOpen,
+  onOpenChange,
+  recoveryMessage,
+  onRetry,
+  extendedThinking,
+  onExtendedThinkingChange,
+}: Props) {
   const id = useId();
+  const controlRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
+  const selectedRef = useRef<HTMLButtonElement>(null);
   const [localOpen, setLocalOpen] = useState(false);
-  const [draft, setDraft] = useState(model);
-  const [custom, setCustom] = useState(Boolean(model && !GEMINI_MODELS.some((item) => item.id === model)));
+  const [localThinking, setLocalThinking] = useState(false);
+  const [custom, setCustom] = useState(false);
+  const [customModel, setCustomModel] = useState("");
+  const [showAllModels, setShowAllModels] = useState(false);
   const isOpen = controlledOpen ?? localOpen;
-  const setOpen = (next: boolean) => {
+  const thinking = extendedThinking ?? localThinking;
+  const thinkingSupported = supportsThinkingControl(model);
+
+  function setOpen(next: boolean) {
     setLocalOpen(next);
     onOpenChange?.(next);
-  };
+  }
+
+  function close(returnFocus = false) {
+    setOpen(false);
+    if (returnFocus) requestAnimationFrame(() => triggerRef.current?.focus({ preventScroll: true }));
+  }
 
   useEffect(() => {
     if (!isOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const frame = requestAnimationFrame(() => closeRef.current?.focus());
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !controlRef.current?.contains(event.target)) close();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close(true);
+      }
+    };
+    const frame = requestAnimationFrame(() => selectedRef.current?.focus({ preventScroll: true }));
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
     return () => {
       cancelAnimationFrame(frame);
-      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
     };
   }, [isOpen, model]);
 
-  useEffect(() => {
-    if (isOpen) return;
-    triggerRef.current?.focus({ preventScroll: true });
-  }, [isOpen]);
-
-  function close() {
-    setOpen(false);
-  }
-
   function openPicker() {
-    setDraft(model);
-    setCustom(Boolean(model && !GEMINI_MODELS.some((item) => item.id === model)));
+    const isCustom = Boolean(model && !GEMINI_MODELS.some((item) => item.id === model));
+    setCustom(isCustom);
+    setCustomModel(isCustom ? model : "");
+    setShowAllModels(false);
     setOpen(true);
   }
 
-  function apply(retry: boolean) {
-    onChange(draft);
-    close();
-    if (retry) onRetry?.(draft);
+  function select(value: string) {
+    const nextThinking = supportsThinkingControl(value) ? thinking : false;
+    onChange(value);
+    if (nextThinking !== thinking) setThinking(nextThinking);
+    close(true);
+    if (recoveryMessage && onRetry) onRetry(value, nextThinking);
   }
 
-  function choose(value: string) {
-    setCustom(value === "__custom__");
-    setDraft(value === "__custom__" ? "" : value);
-  }
-
-  function handleDialogKeyDown(event: React.KeyboardEvent<HTMLElement>) {
-    if (event.key === "Escape") close();
-    if (event.key !== "Tab") return;
-    const focusable = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)')];
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  function setThinking(value: boolean) {
+    setLocalThinking(value);
+    onExtendedThinkingChange?.(value);
   }
 
   function handleRadioKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     const target = event.target;
     if (!(target instanceof HTMLButtonElement) || target.getAttribute("role") !== "radio") return;
-    const radios = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
+    const radios = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]:not(:disabled)')];
     const currentIndex = radios.indexOf(target);
     let nextIndex: number | null = null;
     if (event.key === "ArrowDown" || event.key === "ArrowRight") nextIndex = (currentIndex + 1) % radios.length;
@@ -95,57 +125,156 @@ export function GeminiModelSelect({ model, onChange, disabled, className, open: 
     radios[nextIndex]?.click();
   }
 
+  const selectedId = model || "";
+  const sortedModels = [...GEMINI_MODELS];
+  const featuredModels = [
+    sortedModels.find((item) => /flash-lite/i.test(item.label)),
+    sortedModels.find((item) => /flash/i.test(item.label) && !/flash-lite/i.test(item.label)),
+    sortedModels.find((item) => /\bpro\b/i.test(item.label)),
+  ].filter((item): item is (typeof GEMINI_MODELS)[number] => Boolean(item));
+  const featuredIds = new Set(featuredModels.map((item) => item.id));
+  const extraModels = sortedModels.filter((item) => !featuredIds.has(item.id));
+  const selectedExtra = sortedModels.find((item) => item.id === model && !featuredIds.has(item.id));
+  const remainingModelCount = extraModels.length - Number(Boolean(selectedExtra));
+  const visibleModels = showAllModels ? sortedModels : [...featuredModels, ...(selectedExtra ? [selectedExtra] : [])];
+  const options = [
+    { id: "", label: "Server default", description: "Use the model configured for this product", badge: "" },
+    ...visibleModels.map((item) => ({
+      id: item.id,
+      label: item.label.replace(/\s\((preview|legacy access)\)$/i, ""),
+      description: modelDescription(item.id),
+      badge: item.label.match(/\((preview|legacy access)\)$/i)?.[1] ?? "",
+    })),
+  ];
+
   return (
-    <div className={`${styles.control} ${className ?? ""}`}>
+    <div ref={controlRef} className={`${styles.control} ${className ?? ""}`} data-picker-open={isOpen}>
       <span className={styles.controlLabel}>Gemini model</span>
-      <button ref={triggerRef} className={styles.trigger} type="button" aria-haspopup="dialog" aria-expanded={isOpen} disabled={disabled} onClick={openPicker}>
+      <button
+        ref={triggerRef}
+        className={styles.trigger}
+        type="button"
+        aria-label={`Gemini model: ${modelName(model)}`}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        aria-controls={`${id}-popover`}
+        disabled={disabled}
+        onClick={() => isOpen ? close() : openPicker()}
+      >
         <span className={styles.triggerValue}>{modelName(model)}</span>
-        <span className={styles.triggerAction}>Change <span aria-hidden="true">⌄</span></span>
+        <span className={styles.chevron} aria-hidden="true">{isOpen ? "⌃" : "⌄"}</span>
       </button>
-      <small className={styles.helper}>Use the server default or choose any compatible Gemini model ID.</small>
 
       {isOpen ? (
-        <div className={styles.backdrop} onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-          <section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`} onKeyDown={handleDialogKeyDown}>
-            <header className={styles.header}>
-              <div>
-                <p className={styles.eyebrow}>Generation settings</p>
-                <h2 id={`${id}-title`}>Choose a Gemini model</h2>
-                <p id={`${id}-description`} className={styles.description}>The model is used for this request only. Your form and uploaded evidence stay in place.</p>
+        <section
+          id={`${id}-popover`}
+          className={styles.popover}
+          role="dialog"
+          aria-labelledby={`${id}-title`}
+          onKeyDown={handleRadioKeyDown}
+        >
+          <h2 id={`${id}-title`} className={styles.visuallyHidden}>Choose a Gemini model</h2>
+          {recoveryMessage ? <p className={styles.recovery} role="status">{recoveryMessage}</p> : null}
+          <div className={styles.options} role="radiogroup" aria-label="Available Gemini models">
+            {options.map((option) => {
+              const selected = selectedId === option.id;
+              return (
+                <button
+                  key={option.id || "server-default"}
+                  ref={selected ? selectedRef : undefined}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  className={styles.option}
+                  onClick={() => select(option.id)}
+                >
+                  <span className={styles.optionCopy}>
+                    <span className={styles.optionTitle}>{option.label}</span>
+                    <span className={styles.optionDescription}>{option.description}</span>
+                  </span>
+                  {option.badge ? <span className={styles.badge}>{option.badge}</span> : null}
+                  <span className={styles.check} aria-hidden="true">{selected ? "✓" : ""}</span>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={custom}
+              ref={custom ? selectedRef : undefined}
+              className={styles.option}
+              onClick={() => setCustom(true)}
+            >
+              <span className={styles.optionCopy}>
+                <span className={styles.optionTitle}>Custom model ID</span>
+                <span className={styles.optionDescription}>Use any Gemini model available to your project</span>
+              </span>
+              <span className={styles.check} aria-hidden="true">{custom ? "✓" : ""}</span>
+            </button>
+          </div>
+
+          {!showAllModels && remainingModelCount > 0 ? (
+            <button
+              className={styles.moreModels}
+              type="button"
+              aria-expanded="false"
+              onClick={() => setShowAllModels(true)}
+            >
+              View all Gemini models <span>({remainingModelCount} more)</span>
+            </button>
+          ) : showAllModels ? (
+            <button
+              className={styles.moreModels}
+              type="button"
+              aria-expanded="true"
+              onClick={() => setShowAllModels(false)}
+            >
+              Show fewer models
+            </button>
+          ) : null}
+
+          {custom ? (
+            <form className={styles.customField} onSubmit={(event) => { event.preventDefault(); if (GEMINI_MODEL_PATTERN.test(customModel)) select(customModel); }}>
+              <label htmlFor={`${id}-custom`}>Gemini model ID</label>
+              <div className={styles.customRow}>
+                <input
+                  id={`${id}-custom`}
+                  value={customModel}
+                  onChange={(event) => setCustomModel(event.target.value.trim())}
+                  pattern={GEMINI_MODEL_PATTERN.source}
+                  maxLength={87}
+                  placeholder="gemini-model-name"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <button type="submit" disabled={!GEMINI_MODEL_PATTERN.test(customModel)}>
+                  {recoveryMessage ? "Retry" : "Use"}
+                </button>
               </div>
-              <button ref={closeRef} className={styles.close} type="button" onClick={close} aria-label="Close model selection">×</button>
-            </header>
+            </form>
+          ) : null}
 
-            <div className={styles.activeModel}><span>Active model</span><strong>{modelName(draft)} <span aria-hidden="true">✓</span></strong></div>
-            <div className={styles.options} role="radiogroup" aria-label="Gemini model" onKeyDown={handleRadioKeyDown}>
-              <button type="button" role="radio" aria-checked={!draft && !custom} className={styles.option} onClick={() => choose("")}>
-                <span className={styles.check} aria-hidden="true">{!draft && !custom ? "✓" : ""}</span><span>Server default</span>{model === "" ? <span className={styles.badge}>Current</span> : null}
-              </button>
-              {GEMINI_MODELS.map((item) => {
-                const selected = draft === item.id;
-                const badge = item.label.match(/\((preview|legacy access)\)$/i)?.[1];
-                return <button key={item.id} type="button" role="radio" aria-checked={selected} className={`${styles.option} ${selected ? styles.selected : ""}`} onClick={() => choose(item.id)}>
-                  <span className={styles.check} aria-hidden="true">{selected ? "✓" : ""}</span><span>{item.label.replace(/\s\((preview|legacy access)\)$/i, "")}</span>{badge ? <span className={styles.badge}>{badge}</span> : null}
-                </button>;
-              })}
-              <button type="button" role="radio" aria-checked={custom} className={`${styles.option} ${custom ? styles.selected : ""}`} onClick={() => choose("__custom__")}>
-                <span className={styles.check} aria-hidden="true">{custom ? "✓" : ""}</span><span>Other model</span><span className={styles.badge}>Custom ID</span>
-              </button>
+          <div className={styles.divider} />
+          <div className={styles.thinkingRow}>
+            <div className={styles.thinkingCopy}>
+              <span className={styles.optionTitle}>Extended thinking</span>
+              <span className={styles.optionDescription}>
+                {thinkingSupported ? "Allow more time for complex tasks" : "Thinking settings are controlled by this model"}
+              </span>
             </div>
-
-            {custom ? <label className={styles.customField}>Gemini model ID
-              <input value={draft} onChange={(event) => setDraft(event.target.value)} pattern={GEMINI_MODEL_PATTERN.source} maxLength={87} placeholder="gemini-model-name" required autoComplete="off" spellCheck={false} />
-              <small>Enter a compatible model ID available to your Google project.</small>
-            </label> : null}
-
-            {recoveryMessage ? <div className={styles.recovery} role="status">{recoveryMessage}</div> : null}
-            <footer className={styles.footer}>
-              <button className={styles.cancel} type="button" onClick={close}>Cancel</button>
-              {onRetry ? <button className={styles.apply} type="button" disabled={custom && !GEMINI_MODEL_PATTERN.test(draft)} onClick={() => apply(true)}>Change model &amp; retry</button>
-                : <button className={styles.apply} type="button" disabled={custom && !GEMINI_MODEL_PATTERN.test(draft)} onClick={() => apply(false)}>Use selected model</button>}
-            </footer>
-          </section>
-        </div>
+            <button
+              className={styles.switch}
+              type="button"
+              role="switch"
+              aria-checked={thinking}
+              aria-label="Extended thinking"
+              disabled={!thinkingSupported}
+              onClick={() => setThinking(!thinking)}
+            >
+              <span />
+            </button>
+          </div>
+        </section>
       ) : null}
     </div>
   );
