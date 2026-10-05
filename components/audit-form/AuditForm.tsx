@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useId, useRef, useState } from "react";
+import { GeminiModelSelect } from "@/components/ai/GeminiModelSelect";
 import { AuditResults } from "@/components/audit-results/AuditResults";
 import { validateScreenshot } from "@/lib/validation/file";
 import type { AuditError, AuditResult, AuditScopeType } from "@/src/types/audit";
@@ -48,6 +49,8 @@ export function AuditForm() {
   const [evidence, setEvidence] = useState<EvidencePreview[]>([]);
   const previewUrlsRef = useRef<string[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [model, setModel] = useState("");
+  const [apiError, setApiError] = useState<AuditError | null>(null);
   const [status, setStatus] = useState<string>("");
   const [progressIndex, setProgressIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -135,6 +138,7 @@ export function AuditForm() {
     }
 
     setIsSubmitting(true);
+    setApiError(null);
     setResult(null);
     setStatus("");
     setProgressIndex(0);
@@ -145,6 +149,7 @@ export function AuditForm() {
 
     const body = new FormData();
     evidence.forEach(({ file }) => body.append("screenshot", file));
+    if (model) body.set("model", model);
     body.set("screenTitle", form.screenTitle);
     body.set("scopeType", form.scopeType);
     body.set("targetUser", form.targetUser);
@@ -159,6 +164,7 @@ export function AuditForm() {
 
       if (!response.ok) {
         const error = payload as AuditError;
+        setApiError(error);
         setStatus(error.recovery ? `${error.message} ${error.recovery}` : error.message);
         return;
       }
@@ -181,6 +187,8 @@ export function AuditForm() {
   function resetAudit() {
     clearEvidence();
     setForm(initialFormState);
+    setModel("");
+    setApiError(null);
     setFileError(null);
     setStatus("");
     setResult(null);
@@ -291,12 +299,14 @@ export function AuditForm() {
           </div>
         </section>
 
+        <GeminiModelSelect model={model} onChange={setModel} disabled={isSubmitting} />
+
         <div className="form-actions">
           <button type="submit" disabled={isSubmitting}>{isSubmitting ? "Analyzing evidence…" : result ? "Run another audit" : "Run UX audit"}</button>
           <p className="privacy-note">Evidence is processed for this request and is not persisted by the current public workflow. Product Lab persistence will use reviewer-owned private storage only after its auth boundary is active.</p>
         </div>
 
-        <div className="status-message" role="status" aria-live="polite" aria-atomic="true">
+        <div className="status-message" role={apiError ? "alert" : "status"} aria-live={apiError ? "assertive" : "polite"} aria-atomic="true">
           {isSubmitting ? (
             <div className="audit-progress">
               <span className="audit-progress-spinner" aria-hidden="true" />
@@ -306,6 +316,9 @@ export function AuditForm() {
               </div>
             </div>
           ) : status ? <p>{status}</p> : null}
+          {!isSubmitting && apiError?.canChangeModel ? <button type="button" onClick={() => {
+            document.querySelector<HTMLSelectElement>("[data-gemini-model]")?.focus();
+          }} className="model-recovery-action">Change Gemini model</button> : null}
         </div>
       </form>
 

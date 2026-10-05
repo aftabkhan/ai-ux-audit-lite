@@ -10,6 +10,7 @@ export interface AuditProviderImage {
 export interface AuditProviderInput {
   images: AuditProviderImage[];
   context: AuditContext;
+  model?: string;
 }
 
 export interface AuditProvider {

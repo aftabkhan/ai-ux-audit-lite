@@ -1,3 +1,4 @@
+import { DEFAULT_GEMINI_MODEL, geminiFailureContext, parseGeminiModel } from "@/lib/ai/gemini-models";
 import { NextResponse } from "next/server";
 import { getAuditProvider } from "@/lib/ai/provider-factory";
 import { AuditServiceError, toAuditError } from "@/lib/audit/errors";
@@ -15,6 +16,7 @@ const MAX_SCREENSHOTS_PER_AUDIT = 8;
 const MAX_COMBINED_SCREENSHOT_BYTES = 20 * 1024 * 1024;
 
 export async function POST(request: Request) {
+  let geminiModel: string | undefined;
   try {
     if (productLabProtectionEnabled()) {
       const identity = await getProductLabIdentity();
@@ -116,7 +118,16 @@ export async function POST(request: Request) {
       );
     }
 
+    const requestedModel = parseGeminiModel(formData.get("model"));
+    if (requestedModel === null || formData.getAll("model").length > 1) {
+      throw new AuditServiceError("INVALID_REQUEST", "Choose a valid Gemini model or enter a valid model ID.", 400);
+    }
     const provider = getAuditProvider();
+    if (provider.name === "gemini") {
+      const configuredModel = parseGeminiModel(process.env.GEMINI_AUDIT_MODEL ?? DEFAULT_GEMINI_MODEL);
+      if (configuredModel === null) throw new AuditServiceError("PROVIDER_ERROR", "Gemini generation is not configured correctly.", 503);
+      geminiModel = requestedModel ?? configuredModel ?? DEFAULT_GEMINI_MODEL;
+    }
     const images = await Promise.all(
       screenshots.map(async (screenshot, sequenceIndex) => ({
         bytes: new Uint8Array(await screenshot.arrayBuffer()),
@@ -126,7 +137,7 @@ export async function POST(request: Request) {
       })),
     );
 
-    const rawResult = await provider.review({ images, context: parsedContext });
+    const rawResult = await provider.review({ images, context: parsedContext, model: geminiModel });
 
     const result = auditResultSchema.safeParse(rawResult);
     if (!result.success || !findingsReferenceSubmittedEvidence(result.success ? result.data.findings : [], screenshots.length)) {
@@ -147,7 +158,11 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const mapped = toAuditError(error);
-    return NextResponse.json(mapped.body, {
+    const body = geminiModel ? {
+      ...mapped.body,
+      ...geminiFailureContext({ ...mapped.body, upstreamStatus: error instanceof AuditServiceError ? error.upstreamStatus : undefined }, geminiModel),
+    } : mapped.body;
+    return NextResponse.json(body, {
       status: mapped.status,
       headers: { "Cache-Control": "no-store" },
     });

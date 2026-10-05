@@ -6,6 +6,7 @@ export class AuditServiceError extends Error {
     message: string,
     public readonly status: number,
     public readonly recovery?: string,
+    public readonly upstreamStatus?: number,
   ) {
     super(message);
     this.name = "AuditServiceError";

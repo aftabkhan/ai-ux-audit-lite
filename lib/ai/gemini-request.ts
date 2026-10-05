@@ -6,7 +6,7 @@ export type GeminiErrorCode =
   | "INVALID_RESPONSE";
 
 export class GeminiRequestError extends Error {
-  constructor(public readonly code: GeminiErrorCode, message: string, public readonly status: number) {
+  constructor(public readonly code: GeminiErrorCode, message: string, public readonly status: number, public readonly upstreamStatus?: number) {
     super(message);
     this.name = "GeminiRequestError";
   }
@@ -43,8 +43,8 @@ function timeout(): GeminiRequestError {
 
 function unavailable(status: number): GeminiRequestError {
   return status === 429
-    ? new GeminiRequestError("AI_PROVIDER_RATE_LIMITED", "The AI provider is temporarily rate limited. Please try again later.", 429)
-    : new GeminiRequestError("AI_PROVIDER_UNAVAILABLE", "AI generation is temporarily unavailable. Please try again later.", 503);
+    ? new GeminiRequestError("AI_PROVIDER_RATE_LIMITED", "The AI provider is temporarily rate limited. Please try again later.", 429, status)
+    : new GeminiRequestError("AI_PROVIDER_UNAVAILABLE", "AI generation is temporarily unavailable. Please try again later.", 503, status);
 }
 
 export async function requestGeminiJson(options: {
