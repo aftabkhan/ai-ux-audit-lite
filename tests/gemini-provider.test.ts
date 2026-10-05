@@ -39,6 +39,7 @@ const payload = {
 };
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   delete process.env.GEMINI_API_KEY;
@@ -98,10 +99,26 @@ describe("GeminiAuditProvider", () => {
   it("does not log upstream response bodies on provider failure", async () => {
     process.env.GEMINI_API_KEY = "test-key";
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("sensitive-upstream-detail", { status: 429 })));
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response("sensitive-upstream-detail", { status: 429 })));
 
-    await expect(new GeminiAuditProvider().review(input)).rejects.toMatchObject({ code: "PROVIDER_ERROR" });
-    expect(errorSpy).toHaveBeenCalledWith("Gemini audit request failed", { status: 429 });
+    const assertion = expect(new GeminiAuditProvider().review(input)).rejects.toMatchObject({ code: "AI_PROVIDER_RATE_LIMITED", status: 429 });
+    await vi.runAllTimersAsync();
+    await assertion;
+    vi.useRealTimers();
+    expect(errorSpy).toHaveBeenCalledWith("Gemini request failed", expect.objectContaining({ upstreamStatus: 429, attempt: 4 }));
     expect(errorSpy.mock.calls.flat().join(" ")).not.toContain("sensitive-upstream-detail");
   });
+  it.each([null, {}, { candidates: [null] }, { candidates: [{ content: { parts: [null] } }] }])("rejects invalid provider envelopes", async (raw) => {
+    process.env.GEMINI_API_KEY = "test-key";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(raw))));
+    await expect(new GeminiAuditProvider().review(input)).rejects.toMatchObject({ code: "INVALID_RESPONSE", status: 502 });
+  });
+
+  it("rejects a null model payload", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "null" }] } }] }))));
+    await expect(new GeminiAuditProvider().review(input)).rejects.toMatchObject({ code: "INVALID_RESPONSE", status: 502 });
+  });
+
 });
