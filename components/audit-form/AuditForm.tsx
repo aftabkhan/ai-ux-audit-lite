@@ -50,6 +50,8 @@ export function AuditForm() {
   const previewUrlsRef = useRef<string[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
   const [model, setModel] = useState("");
+  const [extendedThinking, setExtendedThinking] = useState(false);
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [apiError, setApiError] = useState<AuditError | null>(null);
   const [status, setStatus] = useState<string>("");
   const [progressIndex, setProgressIndex] = useState(0);
@@ -128,9 +130,7 @@ export function AuditForm() {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  async function runAudit(selectedModel = model, selectedThinking = extendedThinking) {
     if (evidence.length === 0) {
       setFileError("Add at least one screenshot before starting the audit.");
       document.getElementById(fileInputId)?.focus();
@@ -149,7 +149,8 @@ export function AuditForm() {
 
     const body = new FormData();
     evidence.forEach(({ file }) => body.append("screenshot", file));
-    if (model) body.set("model", model);
+    if (selectedModel) body.set("model", selectedModel);
+    if (selectedModel || selectedThinking) body.set("extendedThinking", String(selectedThinking));
     body.set("screenTitle", form.screenTitle);
     body.set("scopeType", form.scopeType);
     body.set("targetUser", form.targetUser);
@@ -182,6 +183,11 @@ export function AuditForm() {
       window.clearInterval(progressTimer);
       setIsSubmitting(false);
     }
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void runAudit();
   }
 
   function resetAudit() {
@@ -299,7 +305,17 @@ export function AuditForm() {
           </div>
         </section>
 
-        <GeminiModelSelect model={model} onChange={setModel} disabled={isSubmitting} />
+        <GeminiModelSelect
+          model={model}
+          onChange={setModel}
+          disabled={isSubmitting}
+          open={modelPickerOpen}
+          onOpenChange={setModelPickerOpen}
+          recoveryMessage={apiError ? `${apiError.message} ${apiError.recovery ?? ""}`.trim() : undefined}
+          extendedThinking={extendedThinking}
+          onExtendedThinkingChange={setExtendedThinking}
+          onRetry={(nextModel, nextThinking) => { setModel(nextModel); void runAudit(nextModel, nextThinking ?? extendedThinking); }}
+        />
 
         <div className="form-actions">
           <button type="submit" disabled={isSubmitting}>{isSubmitting ? "Analyzing evidence…" : result ? "Run another audit" : "Run UX audit"}</button>
@@ -317,7 +333,7 @@ export function AuditForm() {
             </div>
           ) : status ? <p>{status}</p> : null}
           {!isSubmitting && apiError?.canChangeModel ? <button type="button" onClick={() => {
-            document.querySelector<HTMLSelectElement>("[data-gemini-model]")?.focus();
+            setModelPickerOpen(true);
           }} className="model-recovery-action">Change Gemini model</button> : null}
         </div>
       </form>

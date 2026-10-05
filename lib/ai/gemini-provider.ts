@@ -1,3 +1,4 @@
+import { geminiThinkingConfig } from "@/lib/ai/gemini-models";
 import { GeminiRequestError, requestGeminiJson } from "@/lib/ai/gemini-request";
 import type { AuditProvider, AuditProviderInput } from "@/lib/ai/provider";
 import { buildAuditContextMessage, buildAuditInstructions } from "@/lib/ai/audit-prompt";
@@ -49,6 +50,7 @@ export class GeminiAuditProvider implements AuditProvider {
       },
     ]);
 
+    const thinkingConfig = input.extendedThinking === undefined ? undefined : geminiThinkingConfig(model, input.extendedThinking);
     let raw: unknown;
     try {
       raw = await requestGeminiJson({
@@ -64,7 +66,7 @@ export class GeminiAuditProvider implements AuditProvider {
             role: "user",
             parts: [{ text: buildAuditContextMessage(input.context) }, ...evidenceParts],
           }],
-          generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+          generationConfig: { responseMimeType: "application/json", temperature: 0.2, ...(thinkingConfig ? { thinkingConfig } : {}) },
         },
       });
     } catch (error) {
