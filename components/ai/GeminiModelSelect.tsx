@@ -2,15 +2,16 @@
 import { useId, useState } from "react";
 import { GEMINI_MODELS, GEMINI_MODEL_PATTERN } from "@/lib/ai/gemini-models";
 
-export function GeminiModelSelect({ model, onChange, disabled }: {
+export function GeminiModelSelect({ model, onChange, disabled, className }: {
   model: string;
   onChange: (model: string) => void;
   disabled?: boolean;
+  className?: string;
 }) {
   const id = useId();
   const [custom, setCustom] = useState(false);
   return (
-    <div className="gemini-model-control">
+    <div className={`gemini-model-control${className ? ` ${className}` : ""}`}>
       <label htmlFor={id}>Gemini model</label>
       <select id={id} data-gemini-model aria-describedby={`${id}-help`} disabled={disabled}
         value={custom ? "__custom__" : model}

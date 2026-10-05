@@ -318,7 +318,7 @@ export function AuditForm() {
           ) : status ? <p>{status}</p> : null}
           {!isSubmitting && apiError?.canChangeModel ? <button type="button" onClick={() => {
             document.querySelector<HTMLSelectElement>("[data-gemini-model]")?.focus();
-          }}>Change Gemini model</button> : null}
+          }} className="model-recovery-action">Change Gemini model</button> : null}
         </div>
       </form>
 

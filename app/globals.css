@@ -1262,6 +1262,57 @@ footer p {
   }
 }
 
-.gemini-model-control { display: grid; gap: 0.5rem; margin: 1rem 0; min-width: 0; }
-.gemini-model-control select, .gemini-model-control input { width: 100%; min-width: 0; min-height: 44px; }
-.gemini-model-control small { line-height: 1.5; }
+.gemini-model-control {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+}
+.gemini-model-control label { color: var(--text); font-size: 0.92rem; font-weight: 750; }
+.gemini-model-control select,
+.gemini-model-control input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+}
+.gemini-model-control select:hover,
+.gemini-model-control input:hover { border-color: var(--muted); }
+.gemini-model-control select:focus-visible,
+.gemini-model-control input:focus-visible { outline-color: var(--focus); }
+.gemini-model-control small { color: var(--muted); font-size: 0.84rem; line-height: 1.5; }
+.workspace-frame .gemini-model-control label { color: var(--ws-text); }
+.workspace-frame .gemini-model-control select,
+.workspace-frame .gemini-model-control input {
+  border-color: var(--ws-border);
+  background: var(--ws-surface);
+  color: var(--ws-text);
+}
+.workspace-frame .gemini-model-control select:hover,
+.workspace-frame .gemini-model-control input:hover { border-color: rgba(255, 255, 255, 0.2); }
+.workspace-frame .gemini-model-control select:focus-visible,
+.workspace-frame .gemini-model-control input:focus-visible { outline-color: var(--ws-accent); }
+.workspace-frame .gemini-model-control small { color: var(--ws-muted); }
+.model-recovery-action {
+  min-height: 40px;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.model-recovery-action:hover { border-color: var(--accent); }
+.workspace-frame .model-recovery-action {
+  border-color: rgba(196, 144, 104, 0.42);
+  background: rgba(196, 144, 104, 0.1);
+  color: var(--ws-text);
+}
+.workspace-frame .model-recovery-action:hover { background: rgba(196, 144, 104, 0.18); }
