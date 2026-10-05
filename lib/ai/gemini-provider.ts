@@ -38,7 +38,7 @@ export class GeminiAuditProvider implements AuditProvider {
       throw new AuditServiceError("INVALID_REQUEST", "At least one screenshot is required.", 400);
     }
 
-    const model = process.env.GEMINI_AUDIT_MODEL ?? "gemini-3.6-flash";
+    const model = process.env.GEMINI_AUDIT_MODEL ?? "gemini-3.8-flash";
     const evidenceParts = input.images.flatMap((image, index) => [
       { text: `Evidence ${index + 1} of ${input.images.length}: ${safeEvidenceLabel(image.fileName)}` },
       {

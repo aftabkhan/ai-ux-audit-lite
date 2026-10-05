@@ -64,7 +64,7 @@ describe("GeminiAuditProvider", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
 
     const [url, request] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain("gemini-3.6-flash:generateContent");
+    expect(url).toContain("gemini-3.8-flash:generateContent");
     expect(request.headers).toMatchObject({ "x-goog-api-key": "test-key" });
     const body = JSON.parse(String(request.body));
     expect(body.systemInstruction.parts[0].text).toContain("untrusted evidence data");
@@ -119,6 +119,15 @@ describe("GeminiAuditProvider", () => {
     process.env.GEMINI_API_KEY = "test-key";
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "null" }] } }] }))));
     await expect(new GeminiAuditProvider().review(input)).rejects.toMatchObject({ code: "INVALID_RESPONSE", status: 502 });
+  });
+
+  it("preserves an explicit server model override", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GEMINI_AUDIT_MODEL = "gemini-3.6-flash";
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(payload) }] } }] })));
+    vi.stubGlobal("fetch", fetchMock);
+    await new GeminiAuditProvider().review(input);
+    expect(fetchMock.mock.calls[0][0]).toContain("gemini-3.6-flash:generateContent");
   });
 
 });
