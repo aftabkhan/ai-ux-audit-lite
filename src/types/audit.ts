@@ -96,4 +96,6 @@ export interface AuditError {
   | "UNKNOWN_ERROR";
   message: string;
   recovery?: string;
+  model?: string;
+  canChangeModel?: boolean;
 }
