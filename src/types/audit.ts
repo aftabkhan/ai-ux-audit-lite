@@ -90,6 +90,8 @@ export interface AuditError {
   | "RATE_LIMITED"
   | "PROVIDER_TIMEOUT"
   | "PROVIDER_ERROR"
+  | "AI_PROVIDER_UNAVAILABLE"
+  | "AI_PROVIDER_RATE_LIMITED"
   | "INVALID_RESPONSE"
   | "UNKNOWN_ERROR";
   message: string;

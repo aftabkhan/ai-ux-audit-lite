@@ -1,3 +1,4 @@
+import { GeminiRequestError, requestGeminiJson } from "@/lib/ai/gemini-request";
 import type { AuditProvider, AuditProviderInput } from "@/lib/ai/provider";
 import { buildAuditContextMessage, buildAuditInstructions } from "@/lib/ai/audit-prompt";
 import { AuditServiceError } from "@/lib/audit/errors";
@@ -38,7 +39,6 @@ export class GeminiAuditProvider implements AuditProvider {
     }
 
     const model = process.env.GEMINI_AUDIT_MODEL ?? "gemini-3.6-flash";
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     const evidenceParts = input.images.flatMap((image, index) => [
       { text: `Evidence ${index + 1} of ${input.images.length}: ${safeEvidenceLabel(image.fileName)}` },
       {
@@ -49,60 +49,36 @@ export class GeminiAuditProvider implements AuditProvider {
       },
     ]);
 
-    let response: Response;
+    let raw: unknown;
     try {
-      response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify({
+      raw = await requestGeminiJson({
+        apiKey,
+        model,
+        operation: "audit",
+        timeoutMs: 60_000,
+        body: {
           systemInstruction: {
             parts: [{ text: buildAuditInstructions(input.images.length) }],
           },
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: buildAuditContextMessage(input.context) }, ...evidenceParts],
-            },
-          ],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.2,
-          },
-        }),
-        signal: AbortSignal.timeout(60_000),
+          contents: [{
+            role: "user",
+            parts: [{ text: buildAuditContextMessage(input.context) }, ...evidenceParts],
+          }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+        },
       });
     } catch (error) {
-      if (isTimeoutError(error)) {
-        throw new AuditServiceError(
-          "PROVIDER_TIMEOUT",
-          "The AI provider took too long to complete the audit.",
-          504,
-          "Your inputs are still available. Retry the audit in a moment.",
-        );
+      if (error instanceof GeminiRequestError) {
+        throw new AuditServiceError(error.code, error.message, error.status,
+          "Your inputs are still available. Retry the audit in a moment.");
       }
-      throw new AuditServiceError(
-        "PROVIDER_ERROR",
-        "The AI provider could not be reached.",
-        502,
-        "Check your connection and retry the audit.",
-      );
+      throw error;
     }
 
-    if (!response.ok) {
-      console.error("Gemini audit request failed", { status: response.status });
-      throw new AuditServiceError(
-        "PROVIDER_ERROR",
-        "The AI provider could not complete the screenshot review.",
-        502,
-        "Retry in a moment. If the problem continues, check the provider configuration and usage limits.",
-      );
-    }
-
-    const raw = (await response.json()) as GeminiResponse;
     const parsed = parseModelPayload(extractOutputText(raw));
+    if (!parsed || typeof parsed !== "object") {
+      throw new AuditServiceError("INVALID_RESPONSE", "The AI provider returned an incomplete audit report.", 502, "Retry the audit.");
+    }
     const result: AuditResult = {
       version: "1.0",
       generatedAt: new Date().toISOString(),
@@ -132,19 +108,19 @@ export class GeminiAuditProvider implements AuditProvider {
   }
 }
 
-function isTimeoutError(error: unknown): boolean {
-  return error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError");
-}
-
 function safeEvidenceLabel(fileName: string): string {
   return fileName.replace(/[\r\n\t]/g, " ").slice(0, 120) || "screenshot";
 }
 
-function extractOutputText(response: GeminiResponse): string {
+function extractOutputText(raw: unknown): string {
+  if (!raw || typeof raw !== "object" || !Array.isArray((raw as GeminiResponse).candidates)) {
+    throw new AuditServiceError("INVALID_RESPONSE", "The AI provider returned no audit content.", 502, "Retry the audit.");
+  }
+  const response = raw as GeminiResponse;
   const text = response.candidates
-    ?.flatMap((candidate) => candidate.content?.parts ?? [])
-    .map((part) => part.text)
-    .filter((part): part is string => Boolean(part))
+    ?.flatMap((candidate) => Array.isArray(candidate?.content?.parts) ? candidate.content.parts : [])
+    .map((part) => part?.text)
+    .filter((part): part is string => typeof part === "string" && Boolean(part))
     .join("\n")
     .trim();
 

@@ -9,6 +9,7 @@ import { checkAuditRateLimit } from "@/lib/security/rate-limit";
 import { ACCEPTED_SCREENSHOT_TYPES, MAX_SCREENSHOT_BYTES } from "@/lib/validation/file";
 
 export const runtime = "nodejs";
+export const maxDuration = 65;
 
 const MAX_SCREENSHOTS_PER_AUDIT = 8;
 const MAX_COMBINED_SCREENSHOT_BYTES = 20 * 1024 * 1024;
