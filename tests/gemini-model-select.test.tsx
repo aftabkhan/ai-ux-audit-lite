@@ -11,10 +11,17 @@ describe("Gemini model picker", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Gemini model: Server default/i }));
     expect(screen.getByRole("dialog", { name: "Choose a Gemini model" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("radio", { name: /Gemini 3.7 Flash/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Gemini 3.8 Flash/ }));
 
-    expect(onChange).toHaveBeenCalledWith("gemini-3.7-flash");
+    expect(onChange).toHaveBeenCalledWith("gemini-3.8-flash");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("keeps the remaining model catalog available", () => {
+    render(<GeminiModelSelect model="" onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /Gemini model: Server default/i }));
+    fireEvent.click(screen.getByRole("button", { name: /View all Gemini models/ }));
+    expect(screen.getByRole("radio", { name: /Gemini 3.7 Flash/ })).toBeInTheDocument();
   });
 
   it("accepts custom IDs and retries with the original context retained", () => {
